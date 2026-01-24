@@ -595,8 +595,9 @@ export default function Setup() {
       
       // Track controller connection
       try {
-        // Get baud rate from data first, then settings, with proper fallback
-        const baudRate = data?.baudrate ?? settings?.connection?.baudRate ?? 115200
+        // Use baudrate from event data if available, otherwise fall back to settings
+        // Send the actual value even if it seems invalid - helps debug issues
+        const baudRate = data?.baudrate ?? settings?.connection?.baudRate ?? null
         track('controller_connected', {
           controller_type: data?.controllerType || 'unknown',
           port: data?.port || connectedPort || 'unknown',

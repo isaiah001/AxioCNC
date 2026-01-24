@@ -62,7 +62,11 @@ const sanitizeProperties = (properties: Record<string, unknown>): Record<string,
     }
     
     // Handle different types
-    if (typeof value === 'number' || typeof value === 'boolean') {
+    if (typeof value === 'number') {
+      // Pass numbers through unchanged
+      sanitized[key] = value
+    } else if (typeof value === 'boolean') {
+      // Convert booleans to 1/0
       sanitized[key] = value ? 1 : 0
     } else if (typeof value === 'string') {
       // Special handling for paths and ports
