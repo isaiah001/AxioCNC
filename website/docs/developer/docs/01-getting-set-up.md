@@ -117,8 +117,11 @@ After connecting to the simulator, you can configure it for faster development:
    - `$110=10000` (X-axis max rate, mm/min)
    - `$111=10000` (Y-axis max rate, mm/min)
    - `$112=10000` (Z-axis max rate, mm/min)
+   - `$120=3000` (X-axis acceleration, mm/sec^2)
+   - `$121=3000` (Y-axis acceleration, mm/sec^2)
+   - `$122=3000` (Z-axis acceleration, mm/sec^2)
 
-Setting speeds to 10000 mm/min is a good starting point for faster development cycles.
+These faster speeds in the simulator make testing much faster, but keep in mind that real machines will not typically approach these speeds.
 
 See [Day-1 Workflow](./03-day-1-workflow.md#debugging) for more debugging tips.
 
