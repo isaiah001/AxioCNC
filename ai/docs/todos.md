@@ -13,11 +13,11 @@ x webcam
 x joystick button lock missing
 x run job
 x place model button missing
-red lines on cutting flash
-outline job envelope
-settings export/import
-anonymous usage data
-
+x red lines on cutting flash
+x outline job envelope
+x settings export/import
+x anonymous usage data
+x run means monitor
 
 ## Pre-release
 docs
