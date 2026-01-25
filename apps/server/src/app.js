@@ -739,6 +739,7 @@ const appMain = () => {
     const proxy = httpProxy.createProxyServer({
       target: `http://127.0.0.1:${mediamtxPort}`,
       changeOrigin: false,
+      timeout: 10000, // 10 second timeout for proxy requests
     });
 
     proxy.on('proxyReq', (proxyReq, req, res) => {
@@ -748,16 +749,34 @@ const appMain = () => {
       const mediaMTXPath = originalPath.replace(`/streams/${streamId}`, `/${streamId}`);
 
       proxyReq.path = mediaMTXPath;
+      // Set timeout on the proxy request
+      proxyReq.setTimeout(10000, () => {
+        if (!res.headersSent) {
+          log.warn(`MediaMTX proxy timeout for ${req.path}`);
+          res.status(504).send({
+            msg: 'Stream proxy timeout - MediaMTX may not be responding or stream may not be available',
+            error: 'Gateway Timeout'
+          });
+        }
+      });
       // HLS streaming continuously requests segments - don't log every request
     });
 
     proxy.on('error', (err, req, res) => {
-      log.error(`MediaMTX proxy error: ${err.message}`);
+      log.error(`MediaMTX proxy error for ${req.path}: ${err.message} (code: ${err.code})`);
       if (!res.headersSent) {
-        res.status(502).send({
-          msg: 'Stream proxy error',
-          error: err.message
-        });
+        // Check if it's a connection error (MediaMTX not running)
+        if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+          res.status(503).send({
+            msg: 'MediaMTX service unavailable - stream may not be ready',
+            error: err.message
+          });
+        } else {
+          res.status(502).send({
+            msg: 'Stream proxy error',
+            error: err.message
+          });
+        }
       }
     });
 
