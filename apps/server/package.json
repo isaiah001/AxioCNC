@@ -3,7 +3,10 @@
   "version": "0.0.86",
   "description": "AxioCNC Server - Express API + Socket.IO backend",
   "private": true,
-  "main": "src/cli.js",
+  "main": "dist/cli.js",
+  "files": [
+    "dist/**/*"
+  ],
   "scripts": {
     "build": "pnpm run build:clean && pnpm run build:compile && pnpm run build:copy",
     "build:clean": "rm -rf dist",

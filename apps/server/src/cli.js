@@ -124,17 +124,20 @@ const options = program.opts();
 
 const launchServer = () => new Promise((resolve, reject) => {
   // Server code location depends on build structure:
-  // - In packaged deployment: server-cli.js is at root, server code is at ./dist/
+  // - In Electron packaged deployment: cli.js is in dist/, server code is at ./index (same dir)
   // - In production: server-cli.js is at root, server code is at ./server/
   // - In dev build: cli.js is in server/, server code is at ./
   // Detect location by checking file structure
   const isInServerDir = __filename.includes('/server/cli.js') || __filename.includes('\\server\\cli.js');
+  const isInDistDir = __filename.includes('/dist/cli.js') || __filename.includes('\\dist\\cli.js');
   const hasDistIndex = require('fs').existsSync('./dist/index.js');
   let serverIndexPath;
-  if (isInServerDir) {
+  if (isInDistDir) {
+    serverIndexPath = './index'; // Electron packaged deployment - cli.js is in dist/, index.js is in same dir
+  } else if (isInServerDir) {
     serverIndexPath = './index'; // dev build
   } else if (hasDistIndex) {
-    serverIndexPath = './dist/index'; // packaged deployment
+    serverIndexPath = './dist/index'; // legacy production build
   } else {
     serverIndexPath = './server/index'; // production build
   }
