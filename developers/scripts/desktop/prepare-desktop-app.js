@@ -155,10 +155,11 @@ try {
   if (fs.existsSync(lockfilePath)) {
     fs.copyFileSync(lockfilePath, outputLockfilePath);
   }
+  // Use --ignore-workspace to prevent pnpm from detecting the workspace and removing dependencies
   // Use --no-frozen-lockfile if lockfile doesn't exist, otherwise use --frozen-lockfile
   const installArgs = fs.existsSync(outputLockfilePath)
-    ? ['install', '--prod', '--frozen-lockfile']
-    : ['install', '--prod'];
+    ? ['--ignore-workspace', 'install', '--prod', '--frozen-lockfile']
+    : ['--ignore-workspace', 'install', '--prod'];
   run(getPnpmCommand(), installArgs, {
     cwd: outputRoot,
     env: {
