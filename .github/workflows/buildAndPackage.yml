@@ -90,15 +90,6 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Aptabase key config (backend)
         run: node developers/scripts/generate-aptabase-key.js
-      - name: Debug - Verify VITE_APTABASE_KEY is set
-        run: |
-          if [ -z "$VITE_APTABASE_KEY" ]; then
-            echo "ERROR: VITE_APTABASE_KEY is not set!"
-            exit 1
-          else
-            echo "✓ VITE_APTABASE_KEY is set (length: ${#VITE_APTABASE_KEY})"
-            echo "First 10 chars: ${VITE_APTABASE_KEY:0:10}..."
-          fi
       - name: Build all
         run: |
           # Explicitly export to ensure it's available to pnpm filters
@@ -141,15 +132,6 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Aptabase key config (backend)
         run: node developers/scripts/generate-aptabase-key.js
-      - name: Debug - Verify VITE_APTABASE_KEY is set
-        run: |
-          if [ -z "$VITE_APTABASE_KEY" ]; then
-            echo "ERROR: VITE_APTABASE_KEY is not set!"
-            exit 1
-          else
-            echo "✓ VITE_APTABASE_KEY is set (length: ${#VITE_APTABASE_KEY})"
-            echo "First 10 chars: ${VITE_APTABASE_KEY:0:10}..."
-          fi
       - name: Build all
         run: |
           # Explicitly export to ensure it's available to pnpm filters

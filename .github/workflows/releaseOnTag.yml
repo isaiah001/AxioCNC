@@ -40,7 +40,10 @@ jobs:
         with:
           context: .
           push: true
-          build-args: VERSION=${{ steps.tag_version.outputs.version }}
+          build-args: |
+            VERSION=${{ steps.tag_version.outputs.version }}
+            APTABASE_KEY=${{ secrets.APTABASE_KEY }}
+            VITE_APTABASE_KEY=${{ secrets.APTABASE_KEY }}
           tags: |
             ghcr.io/${{ steps.repo.outputs.name }}:${{ steps.tag_version.outputs.version }}
             ghcr.io/${{ steps.repo.outputs.name }}:latest
@@ -64,6 +67,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Set at job level to ensure it's available to all steps and pnpm filters
+      VITE_APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
+      APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -85,8 +92,13 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Generate Aptabase key config (backend)
+        run: node developers/scripts/generate-aptabase-key.js
       - name: Build all
-        run: pnpm build:all
+        run: |
+          # Explicitly export to ensure it's available to pnpm filters
+          export VITE_APTABASE_KEY="$VITE_APTABASE_KEY"
+          pnpm build:all
       - name: Package desktop app
         run: ${{ matrix.package_cmd }}
       - name: Upload artifacts
@@ -104,6 +116,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Set at job level to ensure it's available to all steps and pnpm filters
+      VITE_APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
+      APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -125,8 +141,13 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Generate Aptabase key config (backend)
+        run: node developers/scripts/generate-aptabase-key.js
       - name: Build all
-        run: pnpm build:all
+        run: |
+          # Explicitly export to ensure it's available to pnpm filters
+          export VITE_APTABASE_KEY="$VITE_APTABASE_KEY"
+          pnpm build:all
       - name: Package server deb
         run: pnpm package:server-${{ matrix.arch }}
       - name: Upload artifacts
