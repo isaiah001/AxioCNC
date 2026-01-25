@@ -99,11 +99,11 @@ const config: Config = {
           items: [
             {
               label: 'Getting Started',
-              to: '/intro',
+              to: '/installation/overview',
             },
             {
               label: 'Installation',
-              to: '/installation/rpi',
+              to: '/installation/overview',
             },
           ],
         },

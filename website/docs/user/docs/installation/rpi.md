@@ -1,198 +1,84 @@
+---
+sidebar_position: 5
+title: Raspberry Pi
+---
+
 # Installing AxioCNC on Raspberry Pi
 
-## Built Installers
+Install AxioCNC on a Raspberry Pi with a desktop (display + keyboard). Use this when the Pi is your main control machine. For headless use, see [Raspberry Pi Server](./rpi-server).
 
-Your Raspberry Pi installer has been built! The following files are in the `output/` directory:
+## Choose Your Package
 
-- **`.deb` package** (recommended): `output/cncjs-app_1.10.5_armv7l.deb`
-- **`.AppImage`** (no install needed): `output/CNCjs-1.10.5-armv7l.AppImage`
+- **Raspberry Pi 3 / 4 (32‑bit):** `axiocnc_*_armv7l.deb`
+- **Raspberry Pi 4 / 5 (64‑bit):** `axiocnc_*_arm64.deb`
 
-The `.deb` package is recommended for normal installation. The `.AppImage` can run directly without installation.
+Download from [GitHub Releases](https://github.com/rsteckler/AxioCNC/releases) or [axiocnc.com](https://axiocnc.com#download).
 
----
+## Steps
 
-## Installation Steps
+1. **Transfer the .deb to the Pi**
 
-### Option 1: Install .deb Package (Recommended)
+   Use `scp`, a USB drive, or another method. Example:
 
-1. **Transfer the installer to your Raspberry Pi:**
-
-   From your development machine:
    ```bash
-   scp output/cncjs-app_1.10.5_armv7l.deb pi@raspberrypi.local:~/
+   scp axiocnc_*_arm64.deb pi@raspberrypi.local:~/
    ```
-   
-   Or use a USB drive, SCP, or any other transfer method.
 
-2. **On the Raspberry Pi, install the package:**
+2. **On the Pi, install the package**
+
    ```bash
    cd ~
-   sudo dpkg -i cncjs-app_1.10.5_armv7l.deb
+   sudo dpkg -i axiocnc_*.deb
+   sudo apt-get install -f   # if dependencies are missing
    ```
 
-3. **If dependencies are missing, install them:**
-   ```bash
-   sudo apt-get install -f
-   ```
+3. **Add your user to the `dialout` group**
 
-4. **Add your user to the `dialout` group** (required for serial port access):
    ```bash
    sudo usermod -a -G dialout $USER
    ```
-   
-   **Important:** Log out and back in (or reboot) for this change to take effect!
 
-5. **Verify serial port access:**
+   Log out and back in (or reboot) so the change applies.
+
+4. **Run AxioCNC**
+
    ```bash
-   # Log out and back in, then check:
-   groups $USER
-   # Should show "dialout" in the list
-   
-   # Check available serial ports:
-   ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+   axiocnc
    ```
 
-6. **Run the application:**
-   ```bash
-   cncjs
-   # or
-   /usr/bin/cncjs
-   ```
-   
-   The application should start and open a browser window at `http://localhost:8000`.
+   A browser opens at `http://localhost:8000`. From another device on the network, use `http://raspberrypi.local:8000` or `http://<pi-ip>:8000`.
 
----
+## Verify Serial Access
 
-### Option 2: Run AppImage (No Installation)
-
-1. **Transfer the AppImage to your Raspberry Pi:**
-   ```bash
-   scp output/CNCjs-1.10.5-armv7l.AppImage pi@raspberrypi.local:~/
-   ```
-
-2. **On the Raspberry Pi, make it executable:**
-   ```bash
-   chmod +x CNCjs-1.10.5-armv7l.AppImage
-   ```
-
-3. **Add user to dialout group** (still required for serial access):
-   ```bash
-   sudo usermod -a -G dialout $USER
-   # Log out and back in
-   ```
-
-4. **Run the AppImage:**
-   ```bash
-   ./CNCjs-1.10.5-armv7l.AppImage
-   ```
-
----
-
-## First Run Setup
-
-1. **Start the application** (see above)
-
-2. **Open browser:** The app should automatically open a browser, or navigate to:
-   ```
-   http://localhost:8000
-   ```
-
-3. **Configure connection:**
-   - Go to **Settings** → **Machine**
-   - Configure your serial port (e.g., `/dev/ttyUSB0` or `/dev/ttyACM0`)
-   - Set baud rate (typically `115200` for Grbl)
-   - Select controller type (Grbl, Marlin, etc.)
-
-4. **Connect to your machine:**
-   - Click **Connect** in the main interface
-   - You should see connection status change
-
----
-
-## Troubleshooting
-
-### Serial Port Not Found
-
-**Problem:** Cannot see or connect to serial devices.
-
-**Solution:**
 ```bash
-# Check if user is in dialout group
 groups $USER
-
-# If not, add:
-sudo usermod -a -G dialout $USER
-# Log out and back in
-
-# Verify device exists:
 ls -l /dev/ttyUSB* /dev/ttyACM*
-
-# Check permissions:
-ls -l /dev/ttyUSB0
-# Should show: crw-rw---- 1 root dialout ... /dev/ttyUSB0
 ```
 
-### Application Won't Start
-
-**Check logs:**
-```bash
-# Run from command line to see errors:
-cncjs
-```
-
-**Check if port is in use:**
-```bash
-sudo lsof -i :8000
-# or
-sudo netstat -tlnp | grep :8000
-```
-
-**Change port:**
-```bash
-cncjs --port 8001
-```
-
-### Permission Denied on Serial Port
-
-**Make sure:**
-1. User is in `dialout` group
-2. Logged out and back in (or rebooted)
-3. Device permissions are correct:
-   ```bash
-   sudo chmod 666 /dev/ttyUSB0  # Temporary fix (resets on reboot)
-   ```
-
----
-
-## Uninstalling
-
-To remove the installed package:
-
-```bash
-sudo apt-get remove cncjs-app
-# or
-sudo dpkg -r cncjs-app
-```
-
-To remove configuration files:
-```bash
-rm -rf ~/.config/cncjs
-# or
-rm -rf ~/.cncjs
-```
-
----
+You should see `dialout` in your groups and your controller’s device listed.
 
 ## Auto-Start on Boot (Optional)
 
-To run NextCNC automatically when the Pi boots:
+The **desktop** .deb does not install a systemd unit. To auto-start on boot you must create one, then enable it.
 
-1. **Create systemd service:**
+**If you use the [headless server package](./rpi-server) instead**, the service is already installed. Just run:
+
+```bash
+sudo systemctl enable axiocnc
+sudo systemctl start axiocnc
+sudo systemctl status axiocnc
+```
+
+For **desktop** (this guide), create the service file:
+
+1. Create `/etc/systemd/system/axiocnc.service`:
+
    ```bash
-   sudo nano /etc/systemd/system/nextcnc.service
+   sudo nano /etc/systemd/system/axiocnc.service
    ```
 
-2. **Add this content:**
+2. Add (replace `pi` with your username if different):
+
    ```ini
    [Unit]
    Description=AxioCNC CNC Controller
@@ -201,37 +87,36 @@ To run NextCNC automatically when the Pi boots:
    [Service]
    Type=simple
    User=pi
-   ExecStart=/usr/bin/cncjs
+   ExecStart=/usr/bin/axiocnc
    Restart=always
    Environment="DISPLAY=:0"
 
    [Install]
    WantedBy=multi-user.target
    ```
-   
-   (Replace `pi` with your username if different)
 
-3. **Enable and start:**
+3. Enable and start:
+
    ```bash
    sudo systemctl enable axiocnc
    sudo systemctl start axiocnc
-   ```
-
-4. **Check status:**
-   ```bash
    sudo systemctl status axiocnc
    ```
 
----
+## Troubleshooting
+
+**Serial port not found or permission denied**
+
+- Confirm `dialout`: `groups $USER`. If missing, run `usermod` again and log out/in.
+- Check devices: `ls -l /dev/ttyUSB* /dev/ttyACM*`.
+
+**Application won’t start**
+
+- Run `axiocnc` in a terminal to see errors.
+- Check port 8000: `sudo lsof -i :8000`. Use `axiocnc --port 8001` if 8000 is in use.
 
 ## Next Steps
 
-After installation:
-1. ✅ Verify serial port access works
-2. ✅ Configure your machine settings
-3. ✅ Test connection to your CNC controller
-4. ✅ Upload a test G-code file
-5. ✅ Test jog controls
-
-Enjoy your CNC controller!
-
+- [First use](../getting-started/first-use)
+- [Connecting to your machine](../getting-started/connecting-to-machine)
+- [Uninstall](./uninstall)
