@@ -29,8 +29,8 @@ if (fs.existsSync(envLocalPath)) {
   require('dotenv').config({ path: envLocalPath });
 }
 
-require('core-js/stable'); // to polyfill ECMAScript features
-require('regenerator-runtime/runtime'); // needed to use transpiled generator functions
+// Polyfills removed - Node.js 18+ (minimum required) and Electron 40 (bundles Node.js 20)
+// have native support for all ECMAScript features and async/await
 const isElectron = require('is-electron');
 const program = require('commander');
 // In dev/prod builds, package.json is copied alongside the compiled server-cli.js
