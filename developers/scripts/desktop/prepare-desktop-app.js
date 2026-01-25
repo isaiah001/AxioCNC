@@ -47,39 +47,6 @@ const ensureDir = (dir) => {
   fs.mkdirSync(dir, { recursive: true });
 };
 
-// Resolve symlinks in node_modules by copying with dereference, then remove .pnpm.
-// Needed on macOS ARM64 because electron-builder fails with ENOENT when copying
-// pnpm's .pnpm symlink structure into the .app bundle.
-const resolveSymlinksInNodeModules = (nodeModulesPath) => {
-  if (!fs.existsSync(nodeModulesPath)) {
-    return;
-  }
-  console.log('🔗 Resolving symlinks in node_modules...');
-  const tempPath = `${nodeModulesPath}.tmp`;
-  if (fs.existsSync(tempPath)) {
-    fs.rmSync(tempPath, { recursive: true, force: true });
-  }
-  fs.cpSync(nodeModulesPath, tempPath, { recursive: true, dereference: true });
-  const pnpmDir = path.join(tempPath, '.pnpm');
-  if (fs.existsSync(pnpmDir)) {
-    fs.rmSync(pnpmDir, { recursive: true, force: true });
-  }
-  fs.rmSync(nodeModulesPath, { recursive: true, force: true });
-  fs.renameSync(tempPath, nodeModulesPath);
-  console.log('✅ Resolved symlinks in node_modules');
-};
-
-// Verify no .pnpm paths remain (symlinks would break electron-builder on macOS ARM64).
-const verifyNoPnpmPaths = (nodeModulesPath) => {
-  const pnpmDir = path.join(nodeModulesPath, '.pnpm');
-  if (fs.existsSync(pnpmDir)) {
-    console.error('❌ node_modules still contains .pnpm after symlink resolution');
-    console.error('   electron-builder will fail with ENOENT when packaging on macOS ARM64.');
-    console.error(`   Path: ${pnpmDir}`);
-    process.exit(1);
-  }
-};
-
 // Parse platform and arch arguments
 const platformFlagIndex = process.argv.indexOf('--platform');
 const archFlagIndex = process.argv.indexOf('--arch');
@@ -139,8 +106,8 @@ let originalSharedDep = null;
 
 try {
   // Deploy to outputRoot - creates outputRoot/dist/, outputRoot/node_modules/, outputRoot/package.json
-  // --legacy flag needed for compatibility with older pnpm versions
-  run(getPnpmCommand(), ['deploy', '--prod', '--filter', '@axiocnc/server', '--legacy', outputRoot], {
+  // Removed --legacy flag as it has bugs with transitive dependencies (ansi-styles, supports-color, etc.)
+  run(getPnpmCommand(), ['deploy', '--prod', '--filter', '@axiocnc/server', outputRoot], {
     cwd: repoRoot,
     env: {
       ...process.env,
@@ -245,14 +212,6 @@ run('npx', ['@electron/rebuild', '--version', electronVersion, '--module-dir', o
   cwd: repoRoot,
 });
 console.log('✅ Native modules rebuilt for Electron');
-
-// Resolve symlinks after rebuild so electron-builder doesn't hit ENOENT on
-// .pnpm paths when packaging. Rebuild can create/modify symlinks.
-// This is needed on all platforms because electron-builder may not handle
-// pnpm's symlink structure correctly, and Windows also needs real files.
-const nodeModulesPath = path.join(outputRoot, 'node_modules');
-resolveSymlinksInNodeModules(nodeModulesPath);
-verifyNoPnpmPaths(nodeModulesPath);
 
 console.log('✅ Verifying bundle layout...');
 assertExists(path.join(outputRoot, 'dist', 'cli.js'), 'server cli.js');
