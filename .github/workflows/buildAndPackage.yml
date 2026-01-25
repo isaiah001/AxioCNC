@@ -70,6 +70,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Set at job level to ensure it's available to all steps and pnpm filters
+      VITE_APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
+      APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,12 +90,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Aptabase key config (backend)
         run: node developers/scripts/generate-aptabase-key.js
-        env:
-          APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
       - name: Build all
         run: pnpm build:all
-        env:
-          VITE_APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
       - name: Package desktop app
         run: ${{ matrix.package_cmd }}
       - name: Upload artifacts
@@ -109,6 +109,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Set at job level to ensure it's available to all steps and pnpm filters
+      VITE_APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
+      APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -125,12 +129,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Aptabase key config (backend)
         run: node developers/scripts/generate-aptabase-key.js
-        env:
-          APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
       - name: Build all
         run: pnpm build:all
-        env:
-          VITE_APTABASE_KEY: ${{ secrets.APTABASE_KEY }}
       - name: Package server deb
         run: pnpm package:server-${{ matrix.arch }}
       - name: Upload artifacts
