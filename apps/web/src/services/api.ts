@@ -382,10 +382,10 @@ export interface JobHistoryJob {
     startTime?: number
     finishTime?: number
     elapsedTime?: number
-    distance?: number // mm
-    distanceX?: number // mm
-    distanceY?: number // mm
-    distanceZ?: number // mm
+    totalDistance?: { x: number; y: number; z: number; total: number }
+    cuttingDistance?: { x: number; y: number; z: number; total: number }
+    transitionDistance?: { x: number; y: number; z: number; total: number }
+    retractDistance?: { x: number; y: number; z: number; total: number }
     operationTypes?: Array<{
       type: string
       percent: number

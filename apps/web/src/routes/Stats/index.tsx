@@ -178,12 +178,11 @@ export default function Stats() {
     
     if (jobHistoryData && jobHistoryData.length > 0) {
       jobHistoryData.forEach(job => {
-        // Stats structure doesn't have distance properties - they're calculated from operationTypes
-        // Use distance properties if they exist, otherwise default to 0
-        const totalDist = { x: job.stats?.distanceX || 0, y: 0, z: job.stats?.distanceZ || 0, total: job.stats?.distance || 0 }
-        const cuttingDist = { x: 0, y: 0, z: 0, total: 0 }
-        const transitionDist = { x: 0, y: 0, z: 0, total: 0 }
-        const retractDist = { x: 0, y: 0, z: 0, total: 0 }
+        // Extract distance data from nested structure
+        const totalDist = job.stats?.totalDistance || { x: 0, y: 0, z: 0, total: 0 }
+        const cuttingDist = job.stats?.cuttingDistance || { x: 0, y: 0, z: 0, total: 0 }
+        const transitionDist = job.stats?.transitionDistance || { x: 0, y: 0, z: 0, total: 0 }
+        const retractDist = job.stats?.retractDistance || { x: 0, y: 0, z: 0, total: 0 }
         
         cumulativeDistanceX += totalDist.x || 0
         cumulativeDistanceY += totalDist.y || 0
@@ -405,8 +404,15 @@ export default function Stats() {
         time: t.time || 0,
         distance: typeof t.distance === 'number' ? t.distance : 0,
       })) || []
-      // Stats structure doesn't match calculateOperationTypes signature - pass empty object
-      const operationTypes = calculateOperationTypes({})
+      
+      // Extract distance data from nested structure
+      const totalDist = job.stats?.totalDistance || { x: 0, y: 0, z: 0, total: 0 }
+      const operationTypes = calculateOperationTypes({
+        totalDistance: job.stats?.totalDistance,
+        cuttingDistance: job.stats?.cuttingDistance,
+        transitionDistance: job.stats?.transitionDistance,
+        retractDistance: job.stats?.retractDistance,
+      })
       
       return {
         id: job.id,
@@ -419,10 +425,10 @@ export default function Stats() {
         toolUsage,
         linesProcessed: job.stats?.received || 0,
         totalLines: job.stats?.total || 0,
-        distance: job.stats?.distance || 0,
-        distanceX: job.stats?.distanceX || 0,
-        distanceY: 0, // Y distance not available in current stats structure
-        distanceZ: job.stats?.distanceZ || 0,
+        distance: totalDist.total || 0,
+        distanceX: totalDist.x || 0,
+        distanceY: totalDist.y || 0,
+        distanceZ: totalDist.z || 0,
         gcode: job.gcode,
         operationTypes,
       }
@@ -446,8 +452,15 @@ export default function Stats() {
       time: t.time || 0,
       distance: typeof t.distance === 'number' ? t.distance : 0,
     })) || []
-    // Stats structure doesn't match calculateOperationTypes signature - pass empty object
-    const operationTypes = calculateOperationTypes({})
+    
+    // Extract distance data from nested structure
+    const totalDist = selectedJobData.stats?.totalDistance || { x: 0, y: 0, z: 0, total: 0 }
+    const operationTypes = calculateOperationTypes({
+      totalDistance: selectedJobData.stats?.totalDistance,
+      cuttingDistance: selectedJobData.stats?.cuttingDistance,
+      transitionDistance: selectedJobData.stats?.transitionDistance,
+      retractDistance: selectedJobData.stats?.retractDistance,
+    })
     
     return {
       id: selectedJobData.id,
@@ -460,10 +473,10 @@ export default function Stats() {
       toolUsage,
       linesProcessed: selectedJobData.stats?.received || 0,
       totalLines: selectedJobData.stats?.total || 0,
-      distance: selectedJobData.stats?.distance || 0,
-      distanceX: selectedJobData.stats?.distanceX || 0,
-      distanceY: 0, // Y distance not available in current stats structure
-      distanceZ: selectedJobData.stats?.distanceZ || 0,
+      distance: totalDist.total || 0,
+      distanceX: totalDist.x || 0,
+      distanceY: totalDist.y || 0,
+      distanceZ: totalDist.z || 0,
       gcode: selectedJobData.gcode,
       operationTypes,
     }
