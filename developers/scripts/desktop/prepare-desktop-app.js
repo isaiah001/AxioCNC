@@ -147,26 +147,6 @@ try {
     },
   });
 
-  // pnpm deploy --prod sometimes misses transitive dependencies. Copy lockfile
-  // and run install --prod to ensure all dependencies (including transitive) are installed.
-  console.log('📦 Ensuring all production dependencies are installed...');
-  const lockfilePath = path.join(repoRoot, 'pnpm-lock.yaml');
-  const outputLockfilePath = path.join(outputRoot, 'pnpm-lock.yaml');
-  if (fs.existsSync(lockfilePath)) {
-    fs.copyFileSync(lockfilePath, outputLockfilePath);
-  }
-  // Use --ignore-workspace to prevent pnpm from detecting the workspace and removing dependencies
-  // Use --no-frozen-lockfile if lockfile doesn't exist, otherwise use --frozen-lockfile
-  const installArgs = fs.existsSync(outputLockfilePath)
-    ? ['--ignore-workspace', 'install', '--prod', '--frozen-lockfile']
-    : ['--ignore-workspace', 'install', '--prod'];
-  run(getPnpmCommand(), installArgs, {
-    cwd: outputRoot,
-    env: {
-      ...process.env,
-    },
-  });
-
   // Temporarily remove @axiocnc/shared from package.json since we'll handle it separately
   // (pnpm deploy will include it as a dependency, but we want to link it from shared/)
   if (fs.existsSync(pkgPath)) {
