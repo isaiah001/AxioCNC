@@ -15,6 +15,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'installation/docker',
         'installation/rpi-server',
+        'installation/linux-headless',
         'installation/windows',
         'installation/mac',
         {type: 'doc', id: 'installation/linux', label: 'Linux (Desktop UI)'},
