@@ -3,21 +3,12 @@
 This document consolidates all project todos from various sources.
 
 ## Before beta release
-x show disconnected status when websocket dies
 x auto updates
 x joystick locked
 x spinup time for spindle before moving
 x First use
-x new version popup showing when versions are equal
-x webcam
-x joystick button lock missing
-x run job
-x place model button missing
-x red lines on cutting flash
-x outline job envelope
-x settings export/import
 x anonymous usage data
-x run means monitor
+
 
 ## Pre-release
 docs
@@ -29,6 +20,8 @@ link filenames in download section of static web
 
 
 ## Later
+on zero tool change, go to console and back and it starts over.
+console not storing lines
 feed, spindle, rapid (cool way to say go slow)
 modal groups (mcpdfupsc): (https://community.carbide3d.com/t/cncjs-feedrate-converted-to-mm-even-though-g20/27111)
 
