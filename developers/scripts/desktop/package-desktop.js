@@ -69,7 +69,7 @@ const bundleRoot = path.join(repoRoot, 'build', `${platform}-${arch}`, 'axiocnc'
 const builderOutputDir = path.join(repoRoot, 'build', `${platform}-${arch}`, 'out');
 const finalOutputDir = path.join(repoRoot, 'out');
 
-run(process.execPath, [prepareScript, '--bundle-dir', bundleRoot]);
+run(process.execPath, [prepareScript, '--platform', platform, '--arch', arch]);
 
 console.log(`📦 Running electron-builder ${electronBuilderArgs.join(' ')}`);
 
