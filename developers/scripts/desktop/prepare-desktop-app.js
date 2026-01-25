@@ -96,8 +96,8 @@ if (fs.existsSync(outputRoot)) {
 }
 ensureDir(outputRoot);
 
-// Deploy server package - this creates dist/, node_modules/, and package.json
-console.log('📦 Deploying server package with pnpm deploy...');
+// Deploy server and desktop packages - this creates dist/, node_modules/, and package.json
+console.log('📦 Deploying server and desktop packages with pnpm deploy...');
 // pnpm deploy needs to run from the repo root and deploy to the output directory
 // We need to temporarily modify package.json to remove @axiocnc/shared dependency
 // since we'll link it manually
@@ -107,7 +107,7 @@ let originalSharedDep = null;
 try {
   // Deploy to outputRoot - creates outputRoot/dist/, outputRoot/node_modules/, outputRoot/package.json
   // Removed --legacy flag as it has bugs with transitive dependencies (ansi-styles, supports-color, etc.)
-  run(getPnpmCommand(), ['deploy', '--prod', '--filter', '@axiocnc/server', outputRoot], {
+  run(getPnpmCommand(), ['deploy', '--prod', '--filter', '@axiocnc/server', '--filter', '@axiocnc/desktop', outputRoot], {
     cwd: repoRoot,
     env: {
       ...process.env,
@@ -200,7 +200,6 @@ if (fs.existsSync(vendorMediamtxPath) && mediamtxPlatform) {
 
 // Rebuild native modules for Electron
 console.log('🔧 Rebuilding native modules for Electron...');
-
 const desktopPkg = require('../../../apps/desktop/package.json');
 
 const electronVersion = desktopPkg.devDependencies?.electron;
