@@ -21,8 +21,8 @@ WORKDIR /build
 # Enable pnpm via corepack
 RUN corepack enable && corepack prepare pnpm@10 --activate
 
-# Copy package manifests and lockfile
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy package manifests, lockfile, and pnpm config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY apps/shared/package.json apps/shared/
@@ -52,7 +52,7 @@ RUN VITE_APTABASE_KEY="$VITE_APTABASE_KEY" pnpm build:all
 
 # Deploy @axiocnc/server to standalone dir (same as package-headless)
 RUN mkdir -p /build/deploy \
-    && pnpm deploy --prod --filter @axiocnc/server --legacy /build/deploy
+    && pnpm deploy --prod --filter @axiocnc/server /build/deploy
 
 # Copy web app and shared into deploy (mirrors package-headless)
 RUN mkdir -p /build/deploy/app /build/deploy/shared \
