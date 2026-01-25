@@ -47,20 +47,36 @@ const ensureDir = (dir) => {
   fs.mkdirSync(dir, { recursive: true });
 };
 
-const copyRecursiveSync = (src, dest) => {
-  const exists = fs.existsSync(src);
-  const stats = exists && fs.statSync(src);
-  const isDirectory = exists && stats.isDirectory();
-  if (isDirectory) {
-    fs.mkdirSync(dest, { recursive: true });
-    fs.readdirSync(src).forEach((childItemName) => {
-      copyRecursiveSync(
-        path.join(src, childItemName),
-        path.join(dest, childItemName)
-      );
-    });
-  } else {
-    fs.copyFileSync(src, dest);
+// Resolve symlinks in node_modules by copying with dereference, then remove .pnpm.
+// Needed on macOS ARM64 because electron-builder fails with ENOENT when copying
+// pnpm's .pnpm symlink structure into the .app bundle.
+const resolveSymlinksInNodeModules = (nodeModulesPath) => {
+  if (!fs.existsSync(nodeModulesPath)) {
+    return;
+  }
+  console.log('🔗 Resolving symlinks in node_modules...');
+  const tempPath = `${nodeModulesPath}.tmp`;
+  if (fs.existsSync(tempPath)) {
+    fs.rmSync(tempPath, { recursive: true, force: true });
+  }
+  fs.cpSync(nodeModulesPath, tempPath, { recursive: true, dereference: true });
+  const pnpmDir = path.join(tempPath, '.pnpm');
+  if (fs.existsSync(pnpmDir)) {
+    fs.rmSync(pnpmDir, { recursive: true, force: true });
+  }
+  fs.rmSync(nodeModulesPath, { recursive: true, force: true });
+  fs.renameSync(tempPath, nodeModulesPath);
+  console.log('✅ Resolved symlinks in node_modules');
+};
+
+// Verify no .pnpm paths remain (symlinks would break electron-builder on macOS ARM64).
+const verifyNoPnpmPaths = (nodeModulesPath) => {
+  const pnpmDir = path.join(nodeModulesPath, '.pnpm');
+  if (fs.existsSync(pnpmDir)) {
+    console.error('❌ node_modules still contains .pnpm after symlink resolution');
+    console.error('   electron-builder will fail with ENOENT when packaging on macOS ARM64.');
+    console.error(`   Path: ${pnpmDir}`);
+    process.exit(1);
   }
 };
 
@@ -177,14 +193,14 @@ if (fs.existsSync(sharedDistPath)) {
     fs.rmSync(sharedLinkPath, { recursive: true, force: true });
   }
   copyDir(sharedDistPath, sharedLinkPath);
-  
+
   // Update package.json in the copied location with corrected main path
   const sharedPkgPath = path.join(repoRoot, 'apps/shared/package.json');
   const sharedPkg = JSON.parse(fs.readFileSync(sharedPkgPath, 'utf8'));
   sharedPkg.main = 'index.js';
   sharedPkg.types = 'index.d.ts';
   fs.writeFileSync(path.join(sharedLinkPath, 'package.json'), JSON.stringify(sharedPkg, null, 2) + '\n');
-  console.log(`✅ Copied shared library to ${sharedLinkPath}`);
+  console.log('✅ Copied shared library to', sharedLinkPath);
 } else {
   console.error(`❌ Shared dist not found at ${sharedDistPath}`);
   process.exit(1);
@@ -210,14 +226,16 @@ if (fs.existsSync(vendorMediamtxPath) && mediamtxPlatform) {
   console.log(`✅ Filtered vendor/mediamtx to ${mediamtxPlatform} only`);
 } else if (fs.existsSync(vendorMediamtxPath)) {
   console.warn(`⚠️  Could not determine mediamtx platform for ${platform}-${arch}`);
-  console.warn(`   Keeping all platform directories in vendor/mediamtx`);
+  console.warn('   Keeping all platform directories in vendor/mediamtx');
 } else {
   console.log('   No vendor/mediamtx directory found, skipping filter');
 }
 
 // Rebuild native modules for Electron
 console.log('🔧 Rebuilding native modules for Electron...');
-const desktopPkg = require(path.join(repoRoot, 'apps/desktop/package.json'));
+
+const desktopPkg = require('../../../apps/desktop/package.json');
+
 const electronVersion = desktopPkg.devDependencies?.electron;
 if (!electronVersion) {
   console.error('❌ Could not read Electron version from apps/desktop/package.json');
@@ -228,6 +246,13 @@ run('npx', ['@electron/rebuild', '--version', electronVersion, '--module-dir', o
 });
 console.log('✅ Native modules rebuilt for Electron');
 
+// Resolve symlinks after rebuild so electron-builder doesn't hit ENOENT on
+// .pnpm paths when packaging on macOS ARM64. Rebuild can create/modify symlinks.
+const nodeModulesPath = path.join(outputRoot, 'node_modules');
+if (platform === 'mac' && arch === 'arm64') {
+  resolveSymlinksInNodeModules(nodeModulesPath);
+  verifyNoPnpmPaths(nodeModulesPath);
+}
 
 console.log('✅ Verifying bundle layout...');
 assertExists(path.join(outputRoot, 'dist', 'cli.js'), 'server cli.js');
