@@ -112,7 +112,13 @@ class Feeder extends events.EventEmitter {
 
     // Clear pending state when the feeder queue is empty
     if (this.state.queue.length === 0) {
+      const wasPending = this.state.pending;
       this.state.pending = false;
+      // Emit change event when queue becomes empty and pending changes
+      // This ensures feeder:status events are emitted when commands complete
+      if (wasPending) {
+        this.emit('change');
+      }
     }
 
     return this.state.pending;
