@@ -3,16 +3,13 @@
 This document consolidates all project todos from various sources.
 
 ## Before beta release
-x auto updates
 x joystick locked
-x spinup time for spindle before moving
-x First use
-x anonymous usage data
+add instructions to web to install with a single command for headless
 
 
 ## Pre-release
-docs
-build package
+x docs
+x build package
 test platfroms
 link filenames in download section of static web
 - [ ] Make sure continue on error works
@@ -20,7 +17,9 @@ link filenames in download section of static web
 
 
 ## Later
-on zero tool change, go to console and back and it starts over.
+Bug template missing
+improve screenshots
+First use
 console not storing lines
 feed, spindle, rapid (cool way to say go slow)
 modal groups (mcpdfupsc): (https://community.carbide3d.com/t/cncjs-feedrate-converted-to-mm-even-though-g20/27111)
