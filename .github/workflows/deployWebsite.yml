@@ -6,7 +6,7 @@ on:
     branches: ["main"]
     paths:
       - 'website/**'
-      - '.github/workflows/website.yml'
+      - '.github/workflows/deployWebsite.yml'
   workflow_dispatch:
 
 permissions:
@@ -63,8 +63,12 @@ jobs:
       - name: Prepare deployment
         run: |
           mkdir -p _site/docs _site/devdocs
-          # Copy static website files to root
+          # Copy static website files to root, preserving permissions
           cp -r website/static/* _site/ 2>/dev/null || true
+          # Ensure install scripts are executable and have correct permissions
+          chmod +x _site/install-* 2>/dev/null || true
+          # Verify install scripts are present (for debugging)
+          ls -la _site/install-* || echo "Warning: Install scripts not found"
           # Copy User Docs Docusaurus build output (with baseUrl='/docs/', files are in build/ directly)
           if [ -d "website/docs/user/build" ]; then
             cp -r website/docs/user/build/* _site/docs/
@@ -73,7 +77,7 @@ jobs:
           if [ -d "website/docs/developer/build" ]; then
             cp -r website/docs/developer/build/* _site/devdocs/
           fi
-          # Ensure .nojekyll for GitHub Pages
+          # Ensure .nojekyll for GitHub Pages (prevents Jekyll processing)
           touch _site/.nojekyll _site/docs/.nojekyll _site/devdocs/.nojekyll
 
       - name: Setup Pages
