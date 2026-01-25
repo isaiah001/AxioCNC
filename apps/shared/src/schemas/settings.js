@@ -27,7 +27,7 @@ export const ControllerSettingsSchema = z.object({}).passthrough();
 // Define toolSpinup schema separately so we can use it for defaults
 const ToolSpinupSchema = z.object({
   enabled: z.boolean().default(true),
-  delaySeconds: z.number().min(0).max(60).default(3),
+  delaySeconds: z.number().min(0).max(60).default(5),
 });
 
 export const MachineLimitsSchema = z.object({

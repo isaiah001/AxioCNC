@@ -115,7 +115,7 @@ const DEFAULT_MACHINE_CONFIG: MachineConfig = {
   homingCorner: 'front-left',  // Most common homing position
   autoSwitchToMonitorEnabled: true,   // Enabled by default
   toolSpinupDelayEnabled: true,   // Enabled by default
-  toolSpinupDelaySeconds: 3,      // 3 seconds default delay
+  toolSpinupDelaySeconds: 5,      // 5 seconds default delay
 }
 
 // Default camera configuration
