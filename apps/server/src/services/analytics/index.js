@@ -81,7 +81,12 @@ const sanitizeProperties = (properties) => {
       continue;
     }
     
-    if (typeof value === 'number' || typeof value === 'boolean') {
+    // Handle different types
+    if (typeof value === 'number') {
+      // Pass numbers through unchanged
+      sanitized[key] = value;
+    } else if (typeof value === 'boolean') {
+      // Convert booleans to 1/0
       sanitized[key] = value ? 1 : 0;
     } else if (typeof value === 'string') {
       if (key === 'file_name' || key.includes('path')) {
