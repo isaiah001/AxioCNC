@@ -25,8 +25,8 @@ module.exports = {
       to: 'axiocnc/app',
     },
     {
-      from: path.join(bundleDir, 'server'),
-      to: 'axiocnc/server',
+      from: path.join(bundleDir, 'dist'),
+      to: 'axiocnc/dist',
     },
     {
       from: path.join(bundleDir, 'shared'),

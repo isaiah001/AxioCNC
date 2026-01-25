@@ -58,9 +58,9 @@ function getMenuTemplates() {
   return require(path.join(__dirname, 'electron-app', 'menu-template'));
 }
 
-// Load launchServer from bundleRoot/server/cli.js
+// Load launchServer from bundleRoot/dist/cli.js
 function getLaunchServer(bundleRoot) {
-  const cliPath = path.join(bundleRoot, 'server', 'cli.js');
+  const cliPath = path.join(bundleRoot, 'dist', 'cli.js');
   if (!fs.existsSync(cliPath)) {
     throw new Error(`Missing server cli.js at: ${cliPath}`);
   }
@@ -80,7 +80,7 @@ function getLaunchServer(bundleRoot) {
     return mod;
   }
 
-  throw new Error(`server/cli.js did not export a function: ${cliPath}`);
+  throw new Error(`dist/cli.js did not export a function: ${cliPath}`);
 }
 
 const pkg = getDesktopPackageJson();
@@ -182,7 +182,7 @@ const showMainWindow = async () => {
   // Validate expected bundle structure with helpful errors
   const expected = [
     { p: bundleRoot, label: 'bundle root' },
-    { p: path.join(bundleRoot, 'server', 'cli.js'), label: 'server cli.js' },
+    { p: path.join(bundleRoot, 'dist', 'cli.js'), label: 'server cli.js' },
     { p: path.join(bundleRoot, 'app'), label: 'web app bundle directory' },
   ];
 
