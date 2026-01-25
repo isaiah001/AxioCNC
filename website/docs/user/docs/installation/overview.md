@@ -9,20 +9,33 @@ This page helps you choose the right way to install AxioCNC and points you to th
 
 ## Installation Methods
 
+### Headless
+
 | Method | Best for | Access |
 |--------|----------|--------|
-| **Linux Desktop** | Daily use on a Linux PC | [Linux](./linux) |
+| **Docker** | Servers, CI, or consistent environments | [Docker](./docker) |
+| **Raspberry Pi Server** | Headless Pi (no display) | [Pi Server](./rpi-server) |
+| **Linux Headless** | Headless Linux server | [Linux Headless](./linux-headless) |
+
+### Desktop Apps
+
+| Method | Best for | Access |
+|--------|----------|--------|
 | **Windows Desktop** | Daily use on a Windows PC | [Windows](./windows) |
 | **macOS Desktop** | Daily use on a Mac | [Mac](./mac) |
+| **Linux Desktop** | Daily use on a Linux PC | [Linux](./linux) |
 | **Raspberry Pi** | Dedicated machine in the shop | [Raspberry Pi](./rpi) |
-| **Raspberry Pi Server** | Headless Pi (no display) | [Pi Server](./rpi-server) |
-| **Docker** | Servers, CI, or consistent environments | [Docker](./docker) |
 
 ## Quick Comparison
 
-- **Desktop installers** (Linux .deb, Windows .exe, Mac .dmg) — Easiest. Install and run. Use when AxioCNC runs on the same machine you use to control the CNC.
-- **Raspberry Pi** — Use when you want a small, always-on machine in the shop. Choose **rpi** if you use a display; **rpi-server** if the Pi is headless.
+### Headless Installations
 - **Docker** — Use when you already run Docker, or want isolated, reproducible setups. Good for headless servers.
+- **Raspberry Pi Server** — Use when you want a small, always-on headless machine in the shop (no display).
+- **Linux Headless** — Use when you want to run AxioCNC on a headless Linux server.
+
+### Desktop Installations
+- **Desktop installers** (Windows .exe, Mac .dmg, Linux .deb) — Easiest. Install and run. Use when AxioCNC runs on the same machine you use to control the CNC.
+- **Raspberry Pi** — Use when you want a small, always-on machine in the shop with a display.
 
 ## Downloads
 

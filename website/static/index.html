@@ -448,17 +448,35 @@
                         <h4 class="text-lg font-semibold mb-2 text-center">Linux Headless</h4>
                         <p class="text-zinc-600 dark:text-zinc-400 text-sm mb-1 text-center">amd64</p>
                         <p class="text-zinc-500 dark:text-zinc-500 text-xs mb-4 text-center">Debian/Ubuntu .deb package</p>
+                        <div class="mb-3 bg-zinc-900 dark:bg-zinc-800 rounded-lg p-3 text-left relative group">
+                            <code class="text-green-400 text-sm block pr-8 break-all" id="install-linux-headless">curl -s axiocnc.com/install-linux-amd64 | sh</code>
+                            <button onclick="copyToClipboard('install-linux-headless', this)" class="absolute top-2 right-2 p-1 text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100" aria-label="Copy command">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="text-center mb-3 text-zinc-400 dark:text-zinc-500 text-sm">— <em>or</em> —</div>
                         <a href="https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-headless_0.0.86_amd64.deb" class="block px-6 py-2 bg-primary-light text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-center" target="_blank" rel="noopener noreferrer">
                             Download
                         </a>
                     </div>
 
-                    <!-- Raspberry Pi ARMv7 -->
+                    <!-- Raspberry Pi ARM64 -->
                     <div class="bg-zinc-50 dark:bg-zinc-950 p-6 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-primary-light transition-colors">
                         <div class="flex justify-center mb-4"><img src="media/raspberrypi.svg" alt="Raspberry Pi" class="w-12 h-12" width="48" height="48" /></div>
                         <h4 class="text-lg font-semibold mb-2 text-center">Raspberry Pi</h4>
-                        <p class="text-zinc-600 dark:text-zinc-400 text-sm mb-1 text-center">ARMv7</p>
+                        <p class="text-zinc-600 dark:text-zinc-400 text-sm mb-1 text-center">ARM64</p>
                         <p class="text-zinc-500 dark:text-zinc-500 text-xs mb-4 text-center">For Raspberry Pi 3+</p>
+                        <div class="mb-3 bg-zinc-900 dark:bg-zinc-800 rounded-lg p-3 text-left relative group">
+                            <code class="text-green-400 text-sm block pr-8 break-all" id="install-rpi-arm64">curl -s axiocnc.com/install-rpi-arm64 | sh</code>
+                            <button onclick="copyToClipboard('install-rpi-arm64', this)" class="absolute top-2 right-2 p-1 text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100" aria-label="Copy command">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="text-center mb-3 text-zinc-400 dark:text-zinc-500 text-sm">— <em>or</em> —</div>
                         <a href="https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-headless_0.0.86_arm64.deb" class="block px-6 py-2 bg-primary-light text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-center" target="_blank" rel="noopener noreferrer">
                             Download
                         </a>
@@ -470,6 +488,15 @@
                         <h4 class="text-lg font-semibold mb-2 text-center">Raspberry Pi</h4>
                         <p class="text-zinc-600 dark:text-zinc-400 text-sm mb-1 text-center">ARMhf</p>
                         <p class="text-zinc-500 dark:text-zinc-500 text-xs mb-4 text-center">For Raspberry Pi 1-2</p>
+                        <div class="mb-3 bg-zinc-900 dark:bg-zinc-800 rounded-lg p-3 text-left relative group">
+                            <code class="text-green-400 text-sm block pr-8 break-all" id="install-rpi-armhf">curl -s axiocnc.com/install-rpi-armhf | sh</code>
+                            <button onclick="copyToClipboard('install-rpi-armhf', this)" class="absolute top-2 right-2 p-1 text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100" aria-label="Copy command">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="text-center mb-3 text-zinc-400 dark:text-zinc-500 text-sm">— <em>or</em> —</div>
                         <a href="https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-headless_0.0.86_armhf.deb" class="block px-6 py-2 bg-primary-light text-white rounded-lg font-semibold hover:opacity-90 transition-opacity text-center" target="_blank" rel="noopener noreferrer">
                             Download
                         </a>
@@ -532,10 +559,22 @@
                             View on GitHub Container Registry
                         </a>
                     </div>
-                    <div class="mt-6 bg-zinc-900 dark:bg-zinc-800 rounded-lg p-4 text-left max-w-2xl mx-auto">
-                        <code class="text-green-400 text-sm">
-                            docker pull ghcr.io/rsteckler/axiocnc:latest
-                        </code>
+                    <div class="mt-6 bg-zinc-900 dark:bg-zinc-800 rounded-lg p-4 text-left max-w-2xl mx-auto relative group">
+                        <div class="font-mono text-sm">
+                            <div class="flex">
+                                <span class="text-zinc-500 select-none mr-2">$</span>
+                                <code class="text-green-400 flex-1 whitespace-pre" id="docker-run-cmd">docker run \
+  -d -p 8000:8000 \
+  --device=/dev/ttyUSB0 \
+  --name axiocnc \
+  ghcr.io/rsteckler/axiocnc:latest</code>
+                            </div>
+                        </div>
+                        <button onclick="copyToClipboard('docker-run-cmd', this)" class="absolute top-4 right-4 p-1 text-zinc-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100" aria-label="Copy command">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -814,6 +853,48 @@
         //         autoPlayInterval = setInterval(nextSlide, 5000);
         //     });
         // }
+        
+        // Copy to clipboard functionality
+        window.copyToClipboard = function(elementId, button) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            const text = element.textContent.trim();
+            
+            // Use modern Clipboard API if available
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    // Show feedback
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                });
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        };
+        
     </script>
 </body>
 </html>

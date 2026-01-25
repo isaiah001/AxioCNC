@@ -11,12 +11,19 @@ For a Pi **with** a desktop, use [Raspberry Pi](./rpi) instead.
 
 ## Quick Install
 
-1. **Install the package**
+1. **Download and install the package**
 
-   Download the server .deb for your Pi (ARMv7 or ARM64) from [GitHub Releases](https://github.com/rsteckler/AxioCNC/releases), then:
-
+   For Raspberry Pi 3+ (64-bit):
    ```bash
-   sudo dpkg -i axiocnc-server_*_arm64.deb   # or armv7l
+   curl -L -o axiocnc-headless_0.0.86_arm64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-headless_0.0.86_arm64.deb
+   sudo dpkg -i axiocnc-headless_0.0.86_arm64.deb
+   sudo apt-get install -f
+   ```
+
+   For Raspberry Pi 1-2 (32-bit ARMhf):
+   ```bash
+   curl -L -o axiocnc-headless_0.0.86_armhf.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-headless_0.0.86_armhf.deb
+   sudo dpkg -i axiocnc-headless_0.0.86_armhf.deb
    sudo apt-get install -f
    ```
 

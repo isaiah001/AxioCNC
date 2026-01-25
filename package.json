@@ -65,6 +65,7 @@
     "package:server-docker": "docker build -t ghcr.io/rsteckler/axiocnc:latest .",
     "release:tag": "node developers/scripts/release.js",
     "release:tag:push": "node developers/scripts/release.js --push",
+    "release:update-web-links": "node developers/scripts/update-web-links.js",
     "clean": "rimraf out build node_modules apps/server/dist apps/desktop/dist apps/web/dist apps/shared/dist apps/web/node_modules apps/server/node_modules apps/desktop/node_modules apps/shared/node_modules"
   },
   "keywords": [

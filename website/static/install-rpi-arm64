@@ -1,0 +1,3 @@
+#!/bin/sh
+set -e
+curl -L https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-headless_0.0.86_arm64.deb | sudo dpkg -i -
