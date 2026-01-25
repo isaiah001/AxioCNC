@@ -1122,6 +1122,9 @@ export default function Monitor() {
   const [wizardMethod, setWizardMethod] = useState<ZeroingMethod | null>(null)
   const [showMethodSelectDialog, setShowMethodSelectDialog] = useState(false)
   const [pendingJobStart, setPendingJobStart] = useState(false) // Track if we need to start job after wizard completes
+  
+  // Probe status (from pinState - 'P' indicates probe contact)
+  const [probeContact, setProbeContact] = useState<boolean>(false)
 
   // Handler for starting wizard from job start (called by JobStatusBar)
   const handleStartWizard = useCallback((method: ZeroingMethod | 'ask' | null) => {
@@ -1182,6 +1185,32 @@ export default function Monitor() {
       setTab('wizard')
     }
   }, [wizardMethod])
+  
+  // Listen for machine status to update probe contact
+  useEffect(() => {
+    const handleMachineStatus = (...args: unknown[]) => {
+      const status = args[1] as {
+        controllerState?: {
+          pinState?: string | null // Grbl v1.1: 'P' indicates probe triggered
+        }
+      }
+      
+      if (!status || !isConnected) return
+      
+      // Update probe contact status from pinState (Grbl v1.1)
+      // pinState contains 'P' when probe is triggered
+      if (status.controllerState?.pinState !== undefined) {
+        const pinState = status.controllerState.pinState || ''
+        setProbeContact(pinState.includes('P'))
+      }
+    }
+    
+    socketService.on('machine:status', handleMachineStatus)
+    
+    return () => {
+      socketService.off('machine:status', handleMachineStatus)
+    }
+  }, [isConnected])
   
   // Panel props with real state from Redux
   const panelProps: PanelProps = {
@@ -1441,21 +1470,23 @@ export default function Monitor() {
                   connectedPort={connectedPort}
                   machinePosition={machinePosition}
                   workPosition={workPosition}
-                  probeContact={false}
+                  probeContact={probeContact}
                   currentWCS="G54"
                 />
               )}
-              {tab === 'wizard' && wizardMethod && (
-                <ZeroingWizardTab
-                  method={wizardMethod}
-                  onClose={handleWizardClose}
-                  isConnected={isConnected}
-                  connectedPort={connectedPort}
-                  machinePosition={machinePosition}
-                  workPosition={workPosition}
-                  probeContact={false}
-                  currentWCS="G54"
-                />
+              {wizardMethod && (
+                <div className={tab === 'wizard' ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>
+                  <ZeroingWizardTab
+                    method={wizardMethod}
+                    onClose={handleWizardClose}
+                    isConnected={isConnected}
+                    connectedPort={connectedPort}
+                    machinePosition={machinePosition}
+                    workPosition={workPosition}
+                    probeContact={probeContact}
+                    currentWCS="G54"
+                  />
+                </div>
               )}
             </div>
           </div>

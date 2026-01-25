@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react'
 import { Target, AlertCircle, HelpCircle, Navigation, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -52,12 +53,56 @@ export function BitSetterNextToolWizard({
   const { data: toolsData } = useGetToolsQuery()
   const jobState = useJobState()
   
+  // Store the last valid nextM6ToolNumber in a ref (before it becomes -1)
+  // This persists across re-renders but resets if component unmounts
+  const lastValidToolNumberRef = useRef<number | undefined>(undefined)
+  
   // Get the next tool number from job state
   const nextToolNumber = jobState?.nextM6ToolNumber
   
+  // Update ref when we have a valid tool number (>= 0)
+  useEffect(() => {
+    if (nextToolNumber !== undefined && nextToolNumber >= 0) {
+      lastValidToolNumberRef.current = nextToolNumber
+    }
+  }, [nextToolNumber])
+  
+  // Derive tool number from m6ToolNumbers array if nextM6ToolNumber is -1
+  // Find the tool that comes after the current tool in the job
+  const deriveToolFromM6Array = (): number | undefined => {
+    const m6ToolNumbers = jobState?.m6ToolNumbers
+    const currentTool = jobState?.stats?.currentTool
+    
+    if (!m6ToolNumbers || m6ToolNumbers.length === 0) {
+      return undefined
+    }
+    
+    // Find the index of the current tool in the array
+    const currentToolIndex = currentTool !== undefined 
+      ? m6ToolNumbers.findIndex(tn => tn === currentTool)
+      : -1
+    
+    // If we found the current tool, the next one is the tool we're changing to
+    if (currentToolIndex >= 0 && currentToolIndex < m6ToolNumbers.length - 1) {
+      const nextTool = m6ToolNumbers[currentToolIndex + 1]
+      if (nextTool > 0) {
+        return nextTool
+      }
+    }
+    
+    return undefined
+  }
+  
+  // Use the current nextM6ToolNumber if valid, otherwise use the last valid one we captured
+  // Fallback to deriving from m6ToolNumbers array, then stats.currentTool
+  const toolNumberToShow = 
+    (nextToolNumber !== undefined && nextToolNumber >= 0) 
+      ? nextToolNumber 
+      : lastValidToolNumberRef.current ?? deriveToolFromM6Array() ?? jobState?.stats?.currentTool
+  
   // Find tool data from tool library
-  const toolData = nextToolNumber !== undefined && nextToolNumber >= 0
-    ? toolsData?.records?.find(t => t.toolId === nextToolNumber)
+  const toolData = toolNumberToShow !== undefined && toolNumberToShow >= 0
+    ? toolsData?.records?.find(t => t.toolId === toolNumberToShow)
     : null
 
   switch (actualStep) {
@@ -186,16 +231,16 @@ export function BitSetterNextToolWizard({
             </div>
           </div>
           {/* Tool Information Panel */}
-          {nextToolNumber !== undefined && nextToolNumber >= 0 && (
+          {toolNumberToShow !== undefined && toolNumberToShow >= 0 ? (
             <div className="p-3 rounded border bg-primary/10 border-primary/30">
               <div className="flex items-center gap-2 mb-2">
                 <Badge variant="default" className="text-xs">
-                  T{nextToolNumber}
+                  T{toolNumberToShow}
                 </Badge>
                 {toolData ? (
                   <span className="text-sm font-medium">{toolData.name}</span>
                 ) : (
-                  <span className="text-sm text-muted-foreground">Tool T{nextToolNumber}</span>
+                  <span className="text-sm text-muted-foreground">Tool T{toolNumberToShow}</span>
                 )}
               </div>
               {toolData && (
@@ -222,7 +267,7 @@ export function BitSetterNextToolWizard({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
           <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-blue-900 dark:text-blue-100">

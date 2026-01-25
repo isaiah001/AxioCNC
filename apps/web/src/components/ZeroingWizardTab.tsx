@@ -59,6 +59,11 @@ export function ZeroingWizardTab({
   const [probeError, setProbeError] = useState<string | null>(null)
   const [bitsetterNavigated, setBitsetterNavigated] = useState(false)
   
+  // Refs for reliable state detection (avoid stale closures)
+  const isProbingRef = useRef(false)
+  const probeStartedRef = useRef(false)
+  const probeCleanupRef = useRef<(() => void) | null>(null)
+  
   // Extensions API for bitsetter toolReference storage
   const [setExtensions] = useSetExtensionsMutation()
   
@@ -91,6 +96,55 @@ export function ZeroingWizardTab({
     setCurrentStep(1)
     setBitsetterNavigated(false)
   }, [method.id])
+  
+  // Sync refs with probe status
+  useEffect(() => {
+    isProbingRef.current = probeStatus === 'probing'
+  }, [probeStatus])
+  
+  // Listen to feeder:status events (always active) - PRIMARY method for detecting probe completion
+  useEffect(() => {
+    const handleFeederStatus = (...args: unknown[]) => {
+      // Only process if we're actively probing (use ref to avoid stale closure)
+      if (!isProbingRef.current || !probeStartedRef.current) {
+        return
+      }
+
+      const feederData = args[0] as {
+        queue?: number
+        pending?: boolean
+        hold?: boolean
+      }
+
+      // Probe complete when queue is empty and not pending and not on hold
+      // This matches the reliable state detection pattern
+      if (feederData.queue === 0 && !feederData.pending && !feederData.hold) {
+        if (probeStartedRef.current && isProbingRef.current) {
+          // Clear any fallback timeouts
+          if (probeCleanupRef.current) {
+            probeCleanupRef.current()
+          }
+          
+          // Mark probe as complete (or capturing for bitsetter first tool)
+          // The specific probe handler will set the appropriate status
+          // For bitsetter first tool, set to 'capturing' to trigger position capture
+          // For others, set to 'complete'
+          if (method.type === 'bitsetter' && isFirstToolChange) {
+            setProbeStatus('capturing')
+          } else {
+            setProbeStatus('complete')
+          }
+          probeStartedRef.current = false
+        }
+      }
+    }
+
+    socketService.on('feeder:status', handleFeederStatus)
+
+    return () => {
+      socketService.off('feeder:status', handleFeederStatus)
+    }
+  }, [probeStatus, method.type, isFirstToolChange])
   
   const totalSteps = getTotalSteps(method, isToolChange, isFirstToolChange, isJobPaused)
   const isLastStep = currentStep === totalSteps
@@ -207,6 +261,7 @@ export function ZeroingWizardTab({
       // First tool change: run macro, then capture position and store tool reference
       setProbeStatus('probing')
       setProbeError(null)
+      probeStartedRef.current = true
       
       const bitsetterMethod = method as Extract<ZeroingMethod, { type: 'bitsetter' }>
       const probeDistance = bitsetterMethod.probeDistance || 50
@@ -248,54 +303,10 @@ export function ZeroingWizardTab({
       
       const macroString = macroLines.join('\n')
       
-      // Parse G-code to count lines for progress tracking
-      // Exclude macro control commands like %wait, %msg that don't generate OK responses
-      const gcodeLines = macroString
-        .split(/\r?\n/)
-        .map((line: string) => line.trim())
-        .filter((line: string) => {
-          // Remove empty lines, comments, and macro control commands
-          if (line.length === 0) return false
-          if (line.startsWith(';')) return false
-          // Exclude %wait and %msg (macro control commands that don't generate OK responses)
-          if (line.match(/^%wait\b/i)) return false
-          if (line.match(/^%msg\b/i)) return false
-          return true
-        })
-      
-      const totalLines = gcodeLines.length
-      
-      if (totalLines === 0) {
-        setProbeError('Failed to generate BitSetter macro. Please check your settings.')
-        setProbeStatus('error')
-        return
-      }
-      
-      let linesReceived = 0
-      let lastWorkflowState: string | null = null
       let isCleanedUp = false
       let timeoutId: NodeJS.Timeout | null = null
-      let currentStatusRef = 'probing'
       
-      // Track progress via serialport:write events (each line sent)
-      const handleSerialWrite = (...args: unknown[]) => {
-        if (isCleanedUp) return
-        
-        const data = args[0] as string
-        const context = args[1] as { source?: string } | undefined
-        
-        // Only count lines sent from the feeder (not manual commands or status queries)
-        // Note: linesSent tracking removed as it was unused
-        if (context?.source === 'feeder' || (!context?.source && data.trim())) {
-          const trimmed = data.trim()
-          // Filter out Grbl status queries and other non-G-code commands
-          if (trimmed && !trimmed.startsWith('$') && !trimmed.match(/^<.*>$/)) {
-            // linesSent++ (removed - unused)
-          }
-        }
-      }
-      
-      // Track responses via serialport:read events (ok responses)
+      // Track errors via serialport:read events (only for error detection)
       const recentMessages: string[] = []
       const handleSerialRead = (...args: unknown[]) => {
         if (isCleanedUp) return
@@ -311,18 +322,7 @@ export function ZeroingWizardTab({
         
         const line = parseConsoleMessage(message, 'read')
         
-        if (line.type === 'ok') {
-          linesReceived++
-          
-          // Check if all lines have been acknowledged - if so, mark as complete immediately
-          if (linesReceived >= totalLines && currentStatusRef === 'probing' && !isCleanedUp) {
-            currentStatusRef = 'complete'
-            // Macro complete - set status to capturing and let existing useEffect handle capture/storage
-            setProbeStatus('capturing')
-            cleanup()
-            return
-          }
-        } else if (line.type === 'error' || line.type === 'alarm') {
+        if (line.type === 'error' || line.type === 'alarm') {
           // Look for the failing line in recent messages (format: "> G0 X0 (ln=15)")
           const failingLine = recentMessages.find(msg => msg.startsWith('> '))
           
@@ -333,42 +333,9 @@ export function ZeroingWizardTab({
           
           setProbeError(errorMsg)
           setProbeStatus('error')
-          currentStatusRef = 'error'
+          probeStartedRef.current = false
           cleanup()
           return
-        }
-      }
-      
-      // Track workflow state changes (idle -> running -> idle = complete)
-      const handleWorkflowState = (...args: unknown[]) => {
-        if (isCleanedUp) return
-        
-        const state = args[0] as string
-        
-        if (lastWorkflowState === null) {
-          lastWorkflowState = state
-        } else if (lastWorkflowState === 'idle' && state === 'running') {
-          // Workflow started - G-code is being executed
-          lastWorkflowState = state
-        } else if (lastWorkflowState === 'running' && state === 'idle') {
-          // Workflow completed - all G-code has finished
-          if (currentStatusRef === 'probing' && !isCleanedUp) {
-            currentStatusRef = 'complete'
-            // Macro complete - set status to capturing and let existing useEffect handle capture/storage
-            setProbeStatus('capturing')
-            cleanup()
-          }
-          lastWorkflowState = state
-        } else {
-          lastWorkflowState = state
-        }
-        
-        // Handle error states
-        if (state === 'error' || state === 'alarm') {
-          setProbeError('Machine entered error state during probe sequence')
-          setProbeStatus('error')
-          currentStatusRef = 'error'
-          cleanup()
         }
       }
       
@@ -378,7 +345,7 @@ export function ZeroingWizardTab({
         if (isCleanedUp) return
         setProbeError('Socket disconnected during probe sequence')
         setProbeStatus('error')
-        currentStatusRef = 'error'
+        probeStartedRef.current = false
         cleanup()
       }
       
@@ -386,9 +353,7 @@ export function ZeroingWizardTab({
         if (isCleanedUp) return
         isCleanedUp = true
         
-        socketService.off('serialport:write', handleSerialWrite)
         socketService.off('serialport:read', handleSerialRead)
-        socketService.off('workflow:state', handleWorkflowState)
         socketService.off('disconnect', handleDisconnect)
         
         if (timeoutId) {
@@ -397,10 +362,11 @@ export function ZeroingWizardTab({
         }
       }
       
-      // Set up listeners
-      socketService.on('serialport:write', handleSerialWrite)
+      // Store cleanup function in ref so feeder:status handler can call it
+      probeCleanupRef.current = cleanup
+      
+      // Set up listeners (only for error detection - completion detected via feeder:status)
       socketService.on('serialport:read', handleSerialRead)
-      socketService.on('workflow:state', handleWorkflowState)
       socketService.once('disconnect', handleDisconnect)
       
       try {
@@ -424,10 +390,10 @@ export function ZeroingWizardTab({
         
         // Set timeout as safety net (5 minutes max)
         timeoutId = setTimeout(() => {
-          if (currentStatusRef === 'probing' && !isCleanedUp) {
+          if (probeStatus === 'probing' && !isCleanedUp) {
             setProbeError('Probe sequence timed out. Please check the machine and try again.')
             setProbeStatus('error')
-            currentStatusRef = 'error'
+            probeStartedRef.current = false
             cleanup()
           }
         }, 5 * 60 * 1000) // 5 minutes
@@ -435,6 +401,7 @@ export function ZeroingWizardTab({
         console.error('BitSetter probe error:', error)
         setProbeError(error instanceof Error ? error.message : 'An error occurred during the probe sequence')
         setProbeStatus('error')
+        probeStartedRef.current = false
         cleanup()
       }
     } else {
@@ -447,6 +414,7 @@ export function ZeroingWizardTab({
       
       setProbeStatus('probing')
       setProbeError(null)
+      probeStartedRef.current = true
       
       // Use stored machine coordinates (captured before navigating to bitsetter)
       if (!storedMachineCoordsRef.current) {
@@ -499,54 +467,10 @@ export function ZeroingWizardTab({
       
       const macroString = macroLines.join('\n')
       
-      // Parse G-code to count lines for progress tracking
-      // Exclude macro control commands like %wait, %msg that don't generate OK responses
-      const gcodeLines = macroString
-        .split(/\r?\n/)
-        .map((line: string) => line.trim())
-        .filter((line: string) => {
-          // Remove empty lines, comments, and macro control commands
-          if (line.length === 0) return false
-          if (line.startsWith(';')) return false
-          // Exclude %wait and %msg (macro control commands that don't generate OK responses)
-          if (line.match(/^%wait\b/i)) return false
-          if (line.match(/^%msg\b/i)) return false
-          return true
-        })
-      
-      const totalLines = gcodeLines.length
-      
-      if (totalLines === 0) {
-        setProbeError('Failed to generate BitSetter macro. Please check your settings.')
-        setProbeStatus('error')
-        return
-      }
-      
-      let linesReceived = 0
-      let lastWorkflowState: string | null = null
       let isCleanedUp = false
       let timeoutId: NodeJS.Timeout | null = null
-      let currentStatusRef = 'probing'
       
-      // Track progress via serialport:write events (each line sent)
-      const handleSerialWrite = (...args: unknown[]) => {
-        if (isCleanedUp) return
-        
-        const data = args[0] as string
-        const context = args[1] as { source?: string } | undefined
-        
-        // Only count lines sent from the feeder (not manual commands or status queries)
-        // Note: linesSent tracking removed as it was unused
-        if (context?.source === 'feeder' || (!context?.source && data.trim())) {
-          const trimmed = data.trim()
-          // Filter out Grbl status queries and other non-G-code commands
-          if (trimmed && !trimmed.startsWith('$') && !trimmed.match(/^<.*>$/)) {
-            // linesSent++ (removed - unused)
-          }
-        }
-      }
-      
-      // Track responses via serialport:read events (ok responses)
+      // Track errors via serialport:read events (only for error detection)
       const recentMessages: string[] = []
       const handleSerialRead = (...args: unknown[]) => {
         if (isCleanedUp) return
@@ -562,18 +486,7 @@ export function ZeroingWizardTab({
         
         const line = parseConsoleMessage(message, 'read')
         
-        if (line.type === 'ok') {
-          linesReceived++
-          
-          // Check if all lines have been acknowledged - if so, mark as complete immediately
-          if (linesReceived >= totalLines && currentStatusRef === 'probing' && !isCleanedUp) {
-            currentStatusRef = 'complete'
-            // Macro complete - set status to capturing and let useEffect handle retract/move
-            setProbeStatus('capturing')
-            cleanup()
-            return
-          }
-        } else if (line.type === 'error' || line.type === 'alarm') {
+        if (line.type === 'error' || line.type === 'alarm') {
           // Look for the failing line in recent messages (format: "> G0 X0 (ln=15)")
           const failingLine = recentMessages.find(msg => msg.startsWith('> '))
           
@@ -584,42 +497,9 @@ export function ZeroingWizardTab({
           
           setProbeError(errorMsg)
           setProbeStatus('error')
-          currentStatusRef = 'error'
+          probeStartedRef.current = false
           cleanup()
           return
-        }
-      }
-      
-      // Track workflow state changes (idle -> running -> idle = complete)
-      const handleWorkflowState = (...args: unknown[]) => {
-        if (isCleanedUp) return
-        
-        const state = args[0] as string
-        
-        if (lastWorkflowState === null) {
-          lastWorkflowState = state
-        } else if (lastWorkflowState === 'idle' && state === 'running') {
-          // Workflow started - G-code is being executed
-          lastWorkflowState = state
-        } else if (lastWorkflowState === 'running' && state === 'idle') {
-          // Workflow completed - all G-code has finished
-          if (currentStatusRef === 'probing' && !isCleanedUp) {
-            currentStatusRef = 'complete'
-            // Macro complete - set status to capturing and let useEffect handle retract/move
-            setProbeStatus('capturing')
-            cleanup()
-          }
-          lastWorkflowState = state
-        } else {
-          lastWorkflowState = state
-        }
-        
-        // Handle error states
-        if (state === 'error' || state === 'alarm') {
-          setProbeError('Machine entered error state during probe sequence')
-          setProbeStatus('error')
-          currentStatusRef = 'error'
-          cleanup()
         }
       }
       
@@ -629,7 +509,7 @@ export function ZeroingWizardTab({
         if (isCleanedUp) return
         setProbeError('Socket disconnected during probe sequence')
         setProbeStatus('error')
-        currentStatusRef = 'error'
+        probeStartedRef.current = false
         cleanup()
       }
       
@@ -637,9 +517,7 @@ export function ZeroingWizardTab({
         if (isCleanedUp) return
         isCleanedUp = true
         
-        socketService.off('serialport:write', handleSerialWrite)
         socketService.off('serialport:read', handleSerialRead)
-        socketService.off('workflow:state', handleWorkflowState)
         socketService.off('disconnect', handleDisconnect)
         
         if (timeoutId) {
@@ -648,10 +526,11 @@ export function ZeroingWizardTab({
         }
       }
       
-      // Set up listeners
-      socketService.on('serialport:write', handleSerialWrite)
+      // Store cleanup function in ref so feeder:status handler can call it
+      probeCleanupRef.current = cleanup
+      
+      // Set up listeners (only for error detection - completion detected via feeder:status)
       socketService.on('serialport:read', handleSerialRead)
-      socketService.on('workflow:state', handleWorkflowState)
       socketService.once('disconnect', handleDisconnect)
       
       try {
@@ -675,10 +554,10 @@ export function ZeroingWizardTab({
         
         // Set timeout as safety net (5 minutes max)
         timeoutId = setTimeout(() => {
-          if (currentStatusRef === 'probing' && !isCleanedUp) {
+          if (probeStatus === 'probing' && !isCleanedUp) {
             setProbeError('Probe sequence timed out. Please check the machine and try again.')
             setProbeStatus('error')
-            currentStatusRef = 'error'
+            probeStartedRef.current = false
             cleanup()
           }
         }, 5 * 60 * 1000) // 5 minutes
@@ -686,6 +565,7 @@ export function ZeroingWizardTab({
         console.error('BitSetter probe error:', error)
         setProbeError(error instanceof Error ? error.message : 'An error occurred during the probe sequence')
         setProbeStatus('error')
+        probeStartedRef.current = false
         cleanup()
       }
     }
@@ -701,6 +581,7 @@ export function ZeroingWizardTab({
     
     setProbeStatus('probing')
     setProbeError(null)
+    probeStartedRef.current = true
     
     const bitzeroMethod = method as Extract<ZeroingMethod, { type: 'bitzero' }>
     
@@ -796,45 +677,10 @@ export function ZeroingWizardTab({
     
     const macroString = macroLines.join('\n')
     
-    // Parse G-code to count lines for progress tracking
-    const gcodeLines = macroString
-      .split(/\r?\n/)
-      .map((line: string) => line.trim())
-      .filter((line: string) => line.length > 0 && !line.startsWith(';')) // Remove empty lines and comments
-    
-    const totalLines = gcodeLines.length
-    
-    if (totalLines === 0) {
-      setProbeError('Failed to generate BitZero macro. Please check your settings.')
-      setProbeStatus('error')
-      return
-    }
-    
-    let linesReceived = 0
-    let lastWorkflowState: string | null = null
     let isCleanedUp = false
     let timeoutId: NodeJS.Timeout | null = null
-    let currentStatusRef = 'probing' // Track status to avoid closure issues
     
-    // Track progress via serialport:write events (each line sent)
-    const handleSerialWrite = (...args: unknown[]) => {
-      if (isCleanedUp) return
-      
-      const data = args[0] as string
-      const context = args[1] as { source?: string } | undefined
-      
-      // Only count lines sent from the feeder (not manual commands or status queries)
-      // Note: linesSent tracking removed as it was unused
-      if (context?.source === 'feeder' || (!context?.source && data.trim())) {
-        const trimmed = data.trim()
-        // Filter out Grbl status queries and other non-G-code commands
-        if (trimmed && !trimmed.startsWith('$') && !trimmed.match(/^<.*>$/)) {
-          // linesSent++ (removed - unused)
-        }
-      }
-    }
-    
-    // Track responses via serialport:read events (ok responses)
+    // Track errors via serialport:read events (only for error detection)
     const recentMessages: string[] = []
     const handleSerialRead = (...args: unknown[]) => {
       if (isCleanedUp) return
@@ -850,17 +696,7 @@ export function ZeroingWizardTab({
       
       const line = parseConsoleMessage(message, 'read')
       
-      if (line.type === 'ok') {
-        linesReceived++
-        
-        // Check if all lines have been acknowledged - if so, mark as complete immediately
-        if (linesReceived >= totalLines && currentStatusRef === 'probing' && !isCleanedUp) {
-          setProbeStatus('complete')
-          currentStatusRef = 'complete'
-          cleanup()
-          return
-        }
-      } else if (line.type === 'error' || line.type === 'alarm') {
+      if (line.type === 'error' || line.type === 'alarm') {
         // Look for the failing line in recent messages (format: "> G0 X0 (ln=15)")
         const failingLine = recentMessages.find(msg => msg.startsWith('> '))
         
@@ -871,41 +707,9 @@ export function ZeroingWizardTab({
         
         setProbeError(errorMsg)
         setProbeStatus('error')
-        currentStatusRef = 'error'
+        probeStartedRef.current = false
         cleanup()
         return
-      }
-    }
-    
-    // Track workflow state changes (idle -> running -> idle = complete)
-    const handleWorkflowState = (...args: unknown[]) => {
-      if (isCleanedUp) return
-      
-      const state = args[0] as string
-      
-      if (lastWorkflowState === null) {
-        lastWorkflowState = state
-      } else if (lastWorkflowState === 'idle' && state === 'running') {
-        // Workflow started - G-code is being executed
-        lastWorkflowState = state
-      } else if (lastWorkflowState === 'running' && state === 'idle') {
-        // Workflow completed - all G-code has finished
-        if (currentStatusRef === 'probing') {
-          setProbeStatus('complete')
-          currentStatusRef = 'complete'
-          cleanup()
-        }
-        lastWorkflowState = state
-      } else {
-        lastWorkflowState = state
-      }
-      
-      // Handle error states
-      if (state === 'error' || state === 'alarm') {
-        setProbeError('Machine entered error state during probe sequence')
-        setProbeStatus('error')
-        currentStatusRef = 'error'
-        cleanup()
       }
     }
     
@@ -915,7 +719,7 @@ export function ZeroingWizardTab({
       if (isCleanedUp) return
       setProbeError('Socket disconnected during probe sequence')
       setProbeStatus('error')
-      currentStatusRef = 'error'
+      probeStartedRef.current = false
       cleanup()
     }
     
@@ -923,9 +727,7 @@ export function ZeroingWizardTab({
       if (isCleanedUp) return
       isCleanedUp = true
       
-      socketService.off('serialport:write', handleSerialWrite)
       socketService.off('serialport:read', handleSerialRead)
-      socketService.off('workflow:state', handleWorkflowState)
       socketService.off('disconnect', handleDisconnect)
       
       if (timeoutId) {
@@ -934,10 +736,11 @@ export function ZeroingWizardTab({
       }
     }
     
-    // Set up listeners
-    socketService.on('serialport:write', handleSerialWrite)
+    // Store cleanup function in ref so feeder:status handler can call it
+    probeCleanupRef.current = cleanup
+    
+    // Set up listeners (only for error detection - completion detected via feeder:status)
     socketService.on('serialport:read', handleSerialRead)
-    socketService.on('workflow:state', handleWorkflowState)
     socketService.once('disconnect', handleDisconnect)
     
     try {
@@ -961,10 +764,10 @@ export function ZeroingWizardTab({
       
       // Set timeout as safety net (5 minutes max)
       timeoutId = setTimeout(() => {
-        if (currentStatusRef === 'probing' && !isCleanedUp) {
+        if (probeStatus === 'probing' && !isCleanedUp) {
           setProbeError('Probe sequence timed out. Please check the machine and try again.')
           setProbeStatus('error')
-          currentStatusRef = 'error'
+          probeStartedRef.current = false
           cleanup()
         }
       }, 5 * 60 * 1000) // 5 minutes
@@ -972,9 +775,10 @@ export function ZeroingWizardTab({
       console.error('BitZero probe error:', error)
       setProbeError(error instanceof Error ? error.message : 'An error occurred during the probe sequence')
       setProbeStatus('error')
+      probeStartedRef.current = false
       cleanup()
     }
-  }, [connectedPort, method, currentWCS, clearBitsetterReference, sendGcode])
+  }, [connectedPort, method, currentWCS, clearBitsetterReference, sendGcode, probeStatus])
   
   const handleCustomProbe = useCallback(async () => {
     if (!connectedPort || method.type !== 'custom') {
@@ -987,6 +791,7 @@ export function ZeroingWizardTab({
     
     setProbeStatus('probing')
     setProbeError(null)
+    probeStartedRef.current = true
     
     const customMethod = method as Extract<ZeroingMethod, { type: 'custom' }>
     const gcodeString = customMethod.gcode.trim()
@@ -994,42 +799,14 @@ export function ZeroingWizardTab({
     if (!gcodeString) {
       setProbeError('No G-code found. Please configure the custom G-code in settings.')
       setProbeStatus('error')
+      probeStartedRef.current = false
       return
     }
     
-    const gcodeLines = gcodeString
-      .split('\n')
-      .map((line: string) => line.trim())
-      .filter((line: string) => line.length > 0 && !line.startsWith(';'))
-    
-    const totalLines = gcodeLines.length
-    
-    if (totalLines === 0) {
-      setProbeError('No G-code found. Please configure the custom G-code in settings.')
-      setProbeStatus('error')
-      return
-    }
-    let linesSent = 0
-    let linesReceived = 0
-    let lastWorkflowState: string | null = null
     let isCleanedUp = false
     let timeoutId: NodeJS.Timeout | null = null
-    let currentStatusRef = 'probing'
     
-    const handleSerialWrite = (...args: unknown[]) => {
-      if (isCleanedUp) return
-      
-      const data = args[0] as string
-      const context = args[1] as { source?: string } | undefined
-      
-      if (context?.source === 'feeder' || (!context?.source && data.trim())) {
-        const trimmed = data.trim()
-        if (trimmed && !trimmed.startsWith('$') && !trimmed.match(/^<.*>$/)) {
-          linesSent++
-        }
-      }
-    }
-    
+    // Track errors via serialport:read events (only for error detection)
     const recentMessages: string[] = []
     const handleSerialRead = (...args: unknown[]) => {
       if (isCleanedUp) return
@@ -1044,16 +821,7 @@ export function ZeroingWizardTab({
       
       const line = parseConsoleMessage(message, 'read')
       
-      if (line.type === 'ok') {
-        linesReceived++
-        
-        if (linesReceived >= totalLines && currentStatusRef === 'probing' && !isCleanedUp) {
-          setProbeStatus('complete')
-          currentStatusRef = 'complete'
-          cleanup()
-          return
-        }
-      } else if (line.type === 'error' || line.type === 'alarm') {
+      if (line.type === 'error' || line.type === 'alarm') {
         const failingLine = recentMessages.find(msg => msg.startsWith('> '))
         
         const errorMsg = failingLine
@@ -1062,37 +830,9 @@ export function ZeroingWizardTab({
         
         setProbeError(errorMsg)
         setProbeStatus('error')
-        currentStatusRef = 'error'
+        probeStartedRef.current = false
         cleanup()
         return
-      }
-    }
-    
-    const handleWorkflowState = (...args: unknown[]) => {
-      if (isCleanedUp) return
-      
-      const state = args[0] as string
-      
-      if (lastWorkflowState === null) {
-        lastWorkflowState = state
-      } else if (lastWorkflowState === 'idle' && state === 'running') {
-        lastWorkflowState = state
-      } else if (lastWorkflowState === 'running' && state === 'idle') {
-        if (currentStatusRef === 'probing') {
-          setProbeStatus('complete')
-          currentStatusRef = 'complete'
-          cleanup()
-        }
-        lastWorkflowState = state
-      } else {
-        lastWorkflowState = state
-      }
-      
-      if (state === 'error' || state === 'alarm') {
-        setProbeError('Machine entered error state during G-code execution')
-        setProbeStatus('error')
-        currentStatusRef = 'error'
-        cleanup()
       }
     }
     
@@ -1101,7 +841,7 @@ export function ZeroingWizardTab({
       if (isCleanedUp) return
       setProbeError('Socket disconnected during G-code execution')
       setProbeStatus('error')
-      currentStatusRef = 'error'
+      probeStartedRef.current = false
       cleanup()
     }
     
@@ -1109,9 +849,7 @@ export function ZeroingWizardTab({
       if (isCleanedUp) return
       isCleanedUp = true
       
-      socketService.off('serialport:write', handleSerialWrite)
       socketService.off('serialport:read', handleSerialRead)
-      socketService.off('workflow:state', handleWorkflowState)
       socketService.off('disconnect', handleDisconnect)
       
       if (timeoutId) {
@@ -1120,9 +858,11 @@ export function ZeroingWizardTab({
       }
     }
     
-    socketService.on('serialport:write', handleSerialWrite)
+    // Store cleanup function in ref so feeder:status handler can call it
+    probeCleanupRef.current = cleanup
+    
+    // Set up listeners (only for error detection - completion detected via feeder:status)
     socketService.on('serialport:read', handleSerialRead)
-    socketService.on('workflow:state', handleWorkflowState)
     socketService.once('disconnect', handleDisconnect)
     
     try {
@@ -1140,24 +880,19 @@ export function ZeroingWizardTab({
       sendGcode(processedGcode)
       
       timeoutId = setTimeout(() => {
-        if (!isCleanedUp && currentStatusRef === 'probing') {
-          console.warn(`G-code execution timeout - lines sent: ${linesSent}/${totalLines}, received: ${linesReceived}/${totalLines}`)
-          if (linesSent >= totalLines * 0.8 && linesReceived >= totalLines * 0.8) {
-            setProbeStatus('complete')
-            currentStatusRef = 'complete'
-          } else {
-            setProbeError('G-code execution may not have completed - please verify manually')
-            setProbeStatus('error')
-            currentStatusRef = 'error'
-          }
+        if (probeStatus === 'probing' && !isCleanedUp) {
+          setProbeError('G-code execution timed out. Please check the machine and verify completion manually.')
+          setProbeStatus('error')
+          probeStartedRef.current = false
           cleanup()
         }
-      }, 60000)
+      }, 5 * 60 * 1000) // 5 minutes (consistent with other probes)
       
     } catch (error) {
       cleanup()
       setProbeError(`Error sending G-code: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setProbeStatus('error')
+      probeStartedRef.current = false
     }
   }, [connectedPort, method, currentWCS, clearBitsetterReference, sendGcode])
   
@@ -1167,12 +902,17 @@ export function ZeroingWizardTab({
   // Store machine X, Y for subsequent tool change (captured before navigating to bitsetter)
   const storedMachineCoordsRef = useRef<{ x: number; y: number } | null>(null)
   
-  // Capture position when probeStatus changes to 'capturing'
+  // Capture position when probeStatus changes to 'capturing' (first tool) or 'complete' (subsequent tool)
   // The macro ends with G4 P0.5 (dwell) and %wait (planner queue empty),
   // so the position is already stable when the macro completes
   useEffect(() => {
-    // Only capture position if we're in capturing state and haven't captured yet
-    if (probeStatus === 'capturing' && !capturingPositionRef.current) {
+    // Handle both 'capturing' (first tool) and 'complete' (subsequent tool) status
+    // For subsequent tool changes, status goes directly to 'complete', so we need to handle that too
+    const shouldProcess = 
+      (probeStatus === 'capturing' || (probeStatus === 'complete' && !isFirstToolChange)) && 
+      !capturingPositionRef.current
+    
+    if (shouldProcess) {
       // The macro already completed with dwell and %wait, so position is stable
       // Just wait a short delay (200ms) for position to be reported, then capture
       if (captureTimeoutRef.current) {
@@ -1239,7 +979,6 @@ export function ZeroingWizardTab({
         } else {
           // Subsequent tool change: no position capture needed, just retract and return to stored XY
           capturingPositionRef.current = true
-          setProbeStatus('complete')
           
           // Retract Z and return to stored X, Y
           if (method.type === 'bitsetter' && connectedPort && storedMachineCoordsRef.current) {
@@ -1252,6 +991,12 @@ export function ZeroingWizardTab({
                 storedMachineCoordsRef.current = null // Clear after use
               }, 500)
             }, 200)
+          } else {
+            console.warn('[ZeroingWizard] Cannot return to stored XY - missing conditions:', {
+              methodType: method.type,
+              hasConnectedPort: !!connectedPort,
+              hasStoredCoords: !!storedMachineCoordsRef.current
+            })
           }
         }
       }, 200) // Short delay just to ensure position is reported
@@ -1384,7 +1129,7 @@ export function ZeroingWizardTab({
         <BitZeroZeroingWizard
           method={method}
           currentStep={currentStep}
-          workPosition={workPosition}
+          machinePosition={machinePosition}
           probeContact={probeContact}
           probeStatus={probeStatus}
           probeError={probeError}
