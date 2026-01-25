@@ -178,14 +178,19 @@ class MediaMTXManager extends events.EventEmitter {
         } catch (err) {
           log.warn(`Failed to inject credentials into RTSP URL for camera ${camera.id}: ${err.message}`);
           // Fallback: try to inject credentials manually
+          // First, remove any existing credentials (handle various formats)
           if (rtspUrl.includes('@')) {
-            // Remove existing credentials
+            // Remove credentials in format: //user:pass@host
             rtspUrl = rtspUrl.replace(/\/\/([^:@]+):([^@]+)@/, '//');
+            // Also handle malformed URLs with double credentials
+            rtspUrl = rtspUrl.replace(/\/\/([^:@]+):([^@]+)@([^:@]+):/, '//$3:');
           }
-          // Add new credentials
+          // Add new credentials before the hostname (match //hostname or //IP)
           if (camera.username || camera.password) {
             const auth = `${camera.username || ''}:${camera.password || ''}`;
-            rtspUrl = rtspUrl.replace(/\/\/([^\/]+)/, `//${auth}@$1`);
+            // Match // followed by hostname/IP (everything up to first / or end of string)
+            // Use a more precise regex that matches hostname/IP only
+            rtspUrl = rtspUrl.replace(/^rtsp:\/\/([^\/@]+)/, `rtsp://${auth}@$1`);
           }
         }
       }

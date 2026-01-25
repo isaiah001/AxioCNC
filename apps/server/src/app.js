@@ -270,15 +270,17 @@ const appMain = () => {
             const user = jwt.verify(token, settings.secret) || {};
             await validateUser(user);
             bypass = true;
-          } catch (err) {
-            log.warn(err);
+          } catch (tokenErr) {
+            log.warn('Token validation failed:', tokenErr);
           }
         }
       }
 
       if (!bypass) {
         const ipaddr = req.ip || req.connection.remoteAddress;
-        log.warn(`Forbidden: ipaddr=${ipaddr}, code="${err.code}", message="${err.message}"`);
+        const errorCode = err?.code || err?.name || 'unknown';
+        const errorMessage = err?.message || 'Authentication failed';
+        log.warn(`Forbidden: ipaddr=${ipaddr}, code="${errorCode}", message="${errorMessage}"`);
         res.status(ERR_FORBIDDEN).end('Forbidden Access');
         return;
       }

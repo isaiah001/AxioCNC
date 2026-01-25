@@ -189,6 +189,7 @@ log "Node: ${NODE_BIN}"
 log "CLI: ${CLI_FILE}"
 log "Args: ${ARGS[*]}"
 log "Working directory: $(pwd)"
+log "Logfile: ${LOG_FILE}"
 
 # Run the server with bundled Node.js
 # Capture both stdout and stderr to log file, but also show errors to user
