@@ -5,7 +5,7 @@ import type { ZeroingMethod } from '../../../../shared/src/schemas/settings'
 interface BitZeroZeroingWizardProps {
   method: Extract<ZeroingMethod, { type: 'bitzero' }>
   currentStep: number
-  workPosition: { x: number; y: number; z: number }
+  machinePosition: { x: number; y: number; z: number }
   probeContact?: boolean
   probeStatus?: 'idle' | 'probing' | 'capturing' | 'storing' | 'complete' | 'error'
   probeError?: string | null
@@ -22,7 +22,7 @@ interface BitZeroZeroingWizardProps {
 export function BitZeroZeroingWizard({
   method,
   currentStep,
-  workPosition,
+  machinePosition,
   probeContact = false,
   probeStatus = 'idle',
   probeError = null,
@@ -137,19 +137,19 @@ export function BitZeroZeroingWizard({
             </div>
           </div>
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-            <div className="text-sm font-medium">Current Work Position:</div>
+            <div className="text-sm font-medium">Current Machine Position:</div>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">X: </span>
-                <span className="font-mono">{workPosition.x.toFixed(3)}</span>
+                <span className="font-mono">{machinePosition.x.toFixed(3)}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Y: </span>
-                <span className="font-mono">{workPosition.y.toFixed(3)}</span>
+                <span className="font-mono">{machinePosition.y.toFixed(3)}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Z: </span>
-                <span className="font-mono">{workPosition.z.toFixed(3)}</span>
+                <span className="font-mono">{machinePosition.z.toFixed(3)}</span>
               </div>
             </div>
           </div>
