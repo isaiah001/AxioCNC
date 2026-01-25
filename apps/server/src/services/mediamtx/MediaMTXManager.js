@@ -168,16 +168,21 @@ class MediaMTXManager extends events.EventEmitter {
           urlObj.username = '';
           urlObj.password = '';
           // Add credentials from separate fields
+          // URL constructor should encode special characters, but we'll manually encode
+          // to ensure RTSP compatibility (some RTSP servers are picky about encoding)
           if (camera.username) {
-            urlObj.username = camera.username;
+            // Encode username (though it's usually safe)
+            urlObj.username = encodeURIComponent(camera.username);
           }
           if (camera.password) {
-            urlObj.password = camera.password;
+            // Encode password to handle special characters like !, @, #, etc.
+            urlObj.password = encodeURIComponent(camera.password);
           }
           rtspUrl = urlObj.toString();
+          log.debug(`MediaMTX RTSP URL with encoded credentials: ${rtspUrl.replace(/\/\/([^:@]+):([^@]+)@/, '//$1:***@')}`);
         } catch (err) {
           log.warn(`Failed to inject credentials into RTSP URL for camera ${camera.id}: ${err.message}`);
-          // Fallback: try to inject credentials manually
+          // Fallback: try to inject credentials manually with encoding
           // First, remove any existing credentials (handle various formats)
           if (rtspUrl.includes('@')) {
             // Remove credentials in format: //user:pass@host
@@ -187,7 +192,10 @@ class MediaMTXManager extends events.EventEmitter {
           }
           // Add new credentials before the hostname (match //hostname or //IP)
           if (camera.username || camera.password) {
-            const auth = `${camera.username || ''}:${camera.password || ''}`;
+            // Encode credentials for RTSP compatibility
+            const encodedUsername = camera.username ? encodeURIComponent(camera.username) : '';
+            const encodedPassword = camera.password ? encodeURIComponent(camera.password) : '';
+            const auth = `${encodedUsername}:${encodedPassword}`;
             // Match // followed by hostname/IP (everything up to first / or end of string)
             // Use a more precise regex that matches hostname/IP only
             rtspUrl = rtspUrl.replace(/^rtsp:\/\/([^\/@]+)/, `rtsp://${auth}@$1`);
