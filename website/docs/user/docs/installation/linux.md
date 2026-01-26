@@ -17,8 +17,8 @@ Install the .deb package on Debian/Ubuntu (x64), then run AxioCNC from the comma
 1. **Download and install the package**
 
    ```bash
-   curl -L -o axiocnc-desktop_0.0.86_amd64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.86/axiocnc-desktop_0.0.86_amd64.deb
-   sudo dpkg -i axiocnc-desktop_0.0.86_amd64.deb
+   curl -L -o axiocnc-desktop_0.0.87_amd64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.87/axiocnc-desktop_0.0.87_amd64.deb
+   sudo dpkg -i axiocnc-desktop_0.0.87_amd64.deb
    sudo apt-get install -f   # if dependencies are missing
    ```
 
