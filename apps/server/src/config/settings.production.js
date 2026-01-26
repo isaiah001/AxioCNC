@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import pkg from '../../package.json';
@@ -13,6 +14,32 @@ const publicPath = ((payload) => {
 
 const maxAge = (365 * 24 * 60 * 60 * 1000); // one year
 
+// Detect web dist path based on deployment context
+// - Headless/server package: web is a dependency at node_modules/@axiocnc/web/dist
+//   From dist/config: .. -> dist, .. -> /opt/axiocnc, then node_modules/@axiocnc/web/dist
+// - Desktop package: web is a peer at ../../../../web/dist (from dist/config)
+// - Development: web is at ../../../web/dist (from dist/config)
+const findWebDistPath = () => {
+  const baseDir = __dirname; // dist/config
+  const candidates = [
+    // Headless/server package: web is a dependency (from dist/config up 2 levels to root, then node_modules/@axiocnc/web/dist)
+    path.resolve(baseDir, '..', '..', 'node_modules', '@axiocnc', 'web', 'dist'),
+    // Desktop package: web is a peer (from dist/config up to node_modules/@axiocnc, then to web)
+    path.resolve(baseDir, '..', '..', '..', '..', 'web', 'dist'),
+    // Development fallback
+    path.resolve(baseDir, '..', '..', '..', 'web', 'dist'),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // Fallback to development path if none found
+  return candidates[2];
+};
+
 export default {
   route: '/', // with trailing slash
   assets: {
@@ -21,7 +48,7 @@ export default {
         urljoin(publicPath, '/'),
         '/' // fallback
       ],
-      path: path.resolve(__dirname, '..', '..', '..', 'web', 'dist'),
+      path: findWebDistPath(),
       maxAge: maxAge
     }
   },
