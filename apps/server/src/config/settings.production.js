@@ -21,7 +21,7 @@ export default {
         urljoin(publicPath, '/'),
         '/' // fallback
       ],
-      path: path.resolve(__dirname, '..', '..', 'app'),
+      path: path.resolve(__dirname, '..', '..', '..', 'web', 'dist'),
       maxAge: maxAge
     }
   },
