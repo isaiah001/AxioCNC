@@ -50,19 +50,6 @@ docker run -d -p 8000:8000 \
   ghcr.io/rsteckler/axiocnc:latest
 ```
 
-## Remote Access
-
-For access from other machines, run with `--host 0.0.0.0` and `--allow-remote-access`:
-
-```bash
-docker run -d -p 8000:8000 \
-  -v ~/.axiocnc:/root/.axiocnc \
-  --device=/dev/ttyUSB0 \
-  --name axiocnc \
-  ghcr.io/rsteckler/axiocnc:latest \
-  --host 0.0.0.0 --allow-remote-access
-```
-
 ## Custom Port
 
 Map host port 8080 to container port 8000:
