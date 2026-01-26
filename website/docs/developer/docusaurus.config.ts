@@ -1,6 +1,26 @@
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env.local file for local development
+// Docusaurus config files can be either CommonJS or ES modules
+let configDir: string;
+try {
+  // Try ES modules approach
+  const __filename = fileURLToPath(import.meta.url);
+  configDir = path.dirname(__filename);
+} catch {
+  // Fallback to CommonJS __dirname
+  // @ts-ignore - __dirname is available in CommonJS
+  configDir = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
+}
+
+// Try loading .env.local from config directory first, then fallback to cwd
+const envPath = path.resolve(configDir, '.env.local');
+dotenv.config({ path: envPath });
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -58,6 +78,11 @@ const config: Config = {
     ],
   ],
   themes: ['@docusaurus/theme-mermaid'],
+
+  customFields: {
+    aptabaseAppKey: process.env.DOCUSAURUS_APTABASE_APP_KEY || '',
+    aptabaseHost: process.env.DOCUSAURUS_APTABASE_HOST || 'https://us.aptabase.com',
+  },
 
   themeConfig: {
     // Replace with your project's social card

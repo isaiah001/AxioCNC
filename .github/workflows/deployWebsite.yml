@@ -49,6 +49,8 @@ jobs:
           GISCUS_REPO_ID: ${{ secrets.GISCUS_REPO_ID }}
           GISCUS_CATEGORY: ${{ secrets.GISCUS_CATEGORY || 'Announcements' }}
           GISCUS_CATEGORY_ID: ${{ secrets.GISCUS_CATEGORY_ID }}
+          DOCUSAURUS_APTABASE_APP_KEY: ${{ secrets.DOCUSAURUS_APTABASE_APP_KEY }}
+          DOCUSAURUS_APTABASE_HOST: ${{ secrets.DOCUSAURUS_APTABASE_HOST || 'https://us.aptabase.com' }}
         run: pnpm build
 
       - name: Build Dev Docs Docusaurus
@@ -58,6 +60,8 @@ jobs:
           GISCUS_REPO_ID: ${{ secrets.GISCUS_REPO_ID }}
           GISCUS_CATEGORY: ${{ secrets.GISCUS_CATEGORY || 'Announcements' }}
           GISCUS_CATEGORY_ID: ${{ secrets.GISCUS_CATEGORY_ID }}
+          DOCUSAURUS_APTABASE_APP_KEY: ${{ secrets.DOCUSAURUS_APTABASE_APP_KEY }}
+          DOCUSAURUS_APTABASE_HOST: ${{ secrets.DOCUSAURUS_APTABASE_HOST || 'https://us.aptabase.com' }}
         run: pnpm build
 
       - name: Prepare deployment
@@ -79,6 +83,14 @@ jobs:
           fi
           # Ensure .nojekyll for GitHub Pages (prevents Jekyll processing)
           touch _site/.nojekyll _site/docs/.nojekyll _site/devdocs/.nojekyll
+
+      # Inject Cloudflare Web Analytics token into static index.html.
+      # Add site at https://dash.cloudflare.com/?to=/:account/web-analytics, then add
+      # CLOUDFLARE_WEB_ANALYTICS_TOKEN as a repo secret (Settings → Secrets and variables → Actions).
+      - name: Inject Cloudflare Web Analytics token
+        if: ${{ secrets.CLOUDFLARE_WEB_ANALYTICS_TOKEN != '' }}
+        run: |
+          sed -i 's|__CLOUDFLARE_WEB_ANALYTICS_TOKEN__|${{ secrets.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}|g' _site/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
