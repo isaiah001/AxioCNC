@@ -9,6 +9,9 @@ if (!outputDir) {
   throw new Error('AXIOCNC_OUTPUT_DIR is required for desktop packaging');
 }
 
+// build-resources (icons, etc.) live next to this config; projectDir may be app staging.
+const buildResourcesDir = path.join(__dirname, 'build-resources');
+
 module.exports = {
   appId: 'org.axiocnc',
   productName: 'AxioCNC',
@@ -16,22 +19,10 @@ module.exports = {
     name: 'axiocnc',
   },
   directories: {
-    buildResources: 'build-resources',
+    buildResources: buildResourcesDir,
     output: outputDir,
   },
   extraResources: [
-    {
-      from: path.join(bundleDir, 'app'),
-      to: 'axiocnc/app',
-    },
-    {
-      from: path.join(bundleDir, 'dist'),
-      to: 'axiocnc/dist',
-    },
-    {
-      from: path.join(bundleDir, 'shared'),
-      to: 'axiocnc/shared',
-    },
     {
       from: path.join(bundleDir, 'node_modules'),
       to: 'axiocnc/node_modules',
@@ -44,7 +35,15 @@ module.exports = {
   files: [
     'dist/**/*',
     'package.json',
+    // FileSet avoids getMainFileMatchers adding !**/node_modules/** (which excludes
+    // node_modules from main matcher). We skip the collector, so we must pack it ourselves.
+    { from: 'node_modules', to: 'node_modules', filter: ['**/*'] },
   ],
+  beforeBuild: async () => {
+    // Skip install/rebuild and electron-builder's pnpm collector. We pack existing
+    // node_modules from app staging (pnpm deploy). See ai/docs/electron-builder-pnpm-root-cause.md.
+    return false;
+  },
   asar: true,
   publish: [],
   artifactName: 'axiocnc-desktop_${version}_${arch}.${ext}',
@@ -53,11 +52,11 @@ module.exports = {
     target: [
       'dmg',
     ],
-    icon: 'build-resources/icon.icns',
+    icon: 'icon.icns',
   },
   dmg: {
-    background: 'build-resources/background.png',
-    icon: 'build-resources/icon.icns',
+    background: 'background.png',
+    icon: 'icon.icns',
     iconSize: 80,
     iconTextSize: 12,
     contents: [
@@ -78,7 +77,7 @@ module.exports = {
     target: [
       'nsis',
     ],
-    icon: 'build-resources/icon.ico',
+    icon: 'icon.ico',
   },
   linux: {
     category: 'Utility',

@@ -6,10 +6,17 @@
   "homepage": "https://github.com/rsteckler/axiocnc",
   "main": "dist/main.js",
   "private": true,
+  "scripts": {
+    "build": "pnpm run build:clean && pnpm run build:compile",
+    "build:clean": "rm -rf dist",
+    "build:compile": "babel src -d dist --config-file ../../babel.config.js"
+  },
   "dependencies": {
+    "@axiocnc/server": "workspace:*",
     "chalk": "~4.1.1",
     "debug": "^4.3.4",
     "electron-store": "~8.1.0",
+    "find-up": "3.0.0",
     "lodash": "~4.17.11",
     "mkdirp": "~0.5.1"
   },

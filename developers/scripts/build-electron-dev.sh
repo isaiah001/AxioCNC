@@ -22,16 +22,10 @@ DEV_BUNDLE="build/${DEV_PLATFORM}-${DEV_ARCH}/axiocnc"
 # Ensure output directory exists
 mkdir -p "${DEV_BUNDLE}/app"
 
-# Build Electron app files (menu-template, etc.)
-# Use same pattern as build-dev.sh
+# Build Electron app (flat dist: main.js + menu-template, etc.)
 npx cross-env NODE_ENV=development npx babel apps/desktop/src \
   --config-file "${PROJECT_ROOT}/babel.config.js" \
-  --out-dir "${DIST_ROOT}/electron-app"
-
-# Build Electron main process
-npx cross-env NODE_ENV=development npx babel apps/desktop/src/main.js \
-  --out-file "${DIST_ROOT}/main.js" \
-  --config-file "${PROJECT_ROOT}/babel.config.js"
+  --out-dir "${DIST_ROOT}"
 
 # Build server (needed for launchServer import)
 npx babel -d "${DEV_BUNDLE}/server" apps/server/src

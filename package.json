@@ -52,7 +52,7 @@
     "build:server": "pnpm --filter @axiocnc/server run build",
     "build:web": "pnpm --filter @axiocnc/web run build",
     "build:shared": "pnpm --filter @axiocnc/shared run build",
-    "build:desktop": "node developers/scripts/desktop/build-desktop-runtime.js",
+    "build:desktop": "pnpm --filter @axiocnc/desktop run build",
     "package:desktop:linux-amd64": "node developers/scripts/desktop/package-desktop.js --linux --x64",
     "package:desktop:linux-arm64": "node developers/scripts/desktop/package-desktop.js --linux --arm64",
     "package:desktop:linux-armv7l": "node developers/scripts/desktop/package-desktop.js --linux --armv7l",

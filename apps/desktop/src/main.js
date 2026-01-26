@@ -47,40 +47,39 @@ function getDesktopPackageJson() {
 }
 
 // Load menu templates:
-// Dev:      apps/desktop/dist/electron-app/menu-template
-// Packaged: <appPath>/dist/electron-app/menu-template
+// Dev:      apps/desktop/dist/menu-template
+// Packaged: <appPath>/dist/menu-template
 function getMenuTemplates() {
   if (app.isPackaged) {
     // eslint-disable-next-line import/no-dynamic-require, global-require
-    return require(path.join(app.getAppPath(), 'dist', 'electron-app', 'menu-template'));
+    return require(path.join(app.getAppPath(), 'dist', 'menu-template'));
   }
   // eslint-disable-next-line import/no-dynamic-require, global-require
-  return require(path.join(__dirname, 'electron-app', 'menu-template'));
+  return require(path.join(__dirname, 'menu-template'));
 }
 
-// Load launchServer from bundleRoot/dist/cli.js
+// Load launchServer from node_modules/@axiocnc/server (server runs from its package root)
 function getLaunchServer(bundleRoot) {
-  const cliPath = path.join(bundleRoot, 'dist', 'cli.js');
+  const serverRoot = path.join(bundleRoot, 'node_modules', '@axiocnc', 'server');
+  const cliPath = path.join(serverRoot, 'dist', 'cli.js');
   if (!fs.existsSync(cliPath)) {
     throw new Error(`Missing server cli.js at: ${cliPath}`);
   }
 
-  // Ensure relative requires inside server code behave predictably
   try {
-    process.chdir(bundleRoot);
+    process.chdir(serverRoot);
   } catch (e) {
-    console.warn(`Warning: could not chdir to ${bundleRoot}`, e);
+    console.warn(`Warning: could not chdir to ${serverRoot}`, e);
   }
 
   // eslint-disable-next-line import/no-dynamic-require, global-require
   const mod = require(cliPath);
 
-  // Your cli.js: module.exports = launchServer (a function)
   if (typeof mod === 'function') {
     return mod;
   }
 
-  throw new Error(`dist/cli.js did not export a function: ${cliPath}`);
+  throw new Error(`server dist/cli.js did not export a function: ${cliPath}`);
 }
 
 const pkg = getDesktopPackageJson();
@@ -180,10 +179,12 @@ const showMainWindow = async () => {
   const bundleRoot = getBundleRoot();
 
   // Validate expected bundle structure with helpful errors
+  const serverRoot = path.join(bundleRoot, 'node_modules', '@axiocnc', 'server');
+  const webRoot = path.join(bundleRoot, 'node_modules', '@axiocnc', 'web');
   const expected = [
     { p: bundleRoot, label: 'bundle root' },
-    { p: path.join(bundleRoot, 'dist', 'cli.js'), label: 'server cli.js' },
-    { p: path.join(bundleRoot, 'app'), label: 'web app bundle directory' },
+    { p: path.join(serverRoot, 'dist', 'cli.js'), label: 'server cli.js' },
+    { p: webRoot, label: 'web app (node_modules/@axiocnc/web)' },
   ];
 
   for (const item of expected) {
@@ -192,7 +193,7 @@ const showMainWindow = async () => {
       if (!app.isPackaged) {
         console.error(chalk.yellow('Dev mode: run pnpm build:all and then package script.'));
       } else {
-        console.error(chalk.yellow('Packaged mode: ensure electron-builder extraResources includes dist/axiocnc -> resources/axiocnc.'));
+        console.error(chalk.yellow('Packaged mode: ensure electron-builder extraResources includes axiocnc (node_modules + package.json).'));
       }
       throw new Error(`Missing ${item.label}: ${item.p}`);
     }
