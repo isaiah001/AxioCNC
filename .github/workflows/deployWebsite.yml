@@ -88,7 +88,7 @@ jobs:
       # Add site at https://dash.cloudflare.com/?to=/:account/web-analytics, then add
       # CLOUDFLARE_WEB_ANALYTICS_TOKEN as a repo secret (Settings → Secrets and variables → Actions).
       - name: Inject Cloudflare Web Analytics token
-        if: ${{ secrets.CLOUDFLARE_WEB_ANALYTICS_TOKEN != '' }}
+        if: ${{ secrets.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
         run: |
           sed -i 's|__CLOUDFLARE_WEB_ANALYTICS_TOKEN__|${{ secrets.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}|g' _site/index.html
 
