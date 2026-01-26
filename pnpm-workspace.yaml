@@ -9,5 +9,6 @@ onlyBuiltDependencies:
   - electron
   - electron-winstaller
   - esbuild
+  - fsevents
   - pre-push
   - spawn-sync
