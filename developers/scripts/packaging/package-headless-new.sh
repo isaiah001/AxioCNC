@@ -1,6 +1,8 @@
 #!/bin/bash
-# Package server build into .deb file using pnpm deploy
-# Much simpler than the old complex staging approach
+# Headless packaging (simplified): deploy + MediaMTX pare + Debian package.
+# Prereqs: pnpm clean, pnpm install, pnpm build:all (run separately).
+# Usage: bash package-headless-new.sh [amd64|arm64|armhf]
+# Example: bash package-headless-new.sh amd64
 
 set -e
 
@@ -17,9 +19,10 @@ fi
 
 PACKAGE_NAME="axiocnc-server"
 INSTALL_DIR="/opt/axiocnc"
-BUILD_ROOT="build/linux-${ARCH}"
-OUT_DIR="out"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+BUILD_ROOT="${PROJECT_ROOT}/build/linux-${ARCH}"
+DEPLOY_DIR="${BUILD_ROOT}/deploy"
+OUT_DIR="${PROJECT_ROOT}/out"
 NODE_VERSION="20.18.0"  # Node.js LTS version to bundle
 
 cd "${PROJECT_ROOT}"
@@ -30,36 +33,90 @@ echo "📦 Packaging AxioCNC server for ${ARCH}..."
 VERSION=$(node -e "console.log(require('./apps/server/package.json').version)")
 echo "Version: ${VERSION}"
 
-# Build all components first
-echo "Building all components..."
-pnpm build:all
+# Pre-flight: assume pnpm clean, install, build:all already done
+echo "🔍 Pre-flight checks..."
+if [ ! -d "apps/server/dist" ]; then
+    echo "❌ Missing server build output (run pnpm build:all first)"
+    exit 1
+fi
+if [ ! -f "apps/server/dist/cli.js" ]; then
+    echo "❌ Missing server dist/cli.js"
+    exit 1
+fi
 
-# Clean previous package build
-rm -rf "${BUILD_ROOT}"
-mkdir -p "${BUILD_ROOT}"
-
-# Use pnpm deploy to create standalone deployment package
-echo "Creating standalone deployment package with pnpm deploy..."
-DEPLOY_DIR="${BUILD_ROOT}/deploy"
+# Prepare deploy directory
+echo "🧹 Preparing ${DEPLOY_DIR}..."
 rm -rf "${DEPLOY_DIR}"
 mkdir -p "${DEPLOY_DIR}"
 
+# Deploy server (server, web, shared end up in node_modules/@axiocnc/*)
+echo "📦 Deploying @axiocnc/server..."
 pnpm deploy --prod --filter @axiocnc/server "${DEPLOY_DIR}" || {
-  echo "Error: pnpm deploy failed"
-  exit 1
+    echo "❌ pnpm deploy failed"
+    exit 1
 }
 
-# Copy web app and shared to the deployed package
-echo "Copying web app and shared to deployment..."
-mkdir -p "${DEPLOY_DIR}/app"
-mkdir -p "${DEPLOY_DIR}/shared"
-
-if [ -d "apps/web/dist" ]; then
-  cp -r apps/web/dist/* "${DEPLOY_DIR}/app/"
+# Verify deploy layout
+echo "✅ Verifying bundle layout..."
+if [ ! -d "${DEPLOY_DIR}/node_modules" ]; then
+    echo "❌ Missing node_modules"
+    exit 1
+fi
+if [ ! -f "${DEPLOY_DIR}/package.json" ]; then
+    echo "❌ Missing package.json"
+    exit 1
+fi
+SERVER_ROOT="${DEPLOY_DIR}/node_modules/@axiocnc/server"
+if [ ! -d "${SERVER_ROOT}" ]; then
+    echo "❌ Missing node_modules/@axiocnc/server"
+    exit 1
+fi
+SERVER_CLI="${SERVER_ROOT}/dist/cli.js"
+if [ ! -f "${SERVER_CLI}" ]; then
+    echo "❌ Missing server dist/cli.js"
+    exit 1
 fi
 
-if [ -d "apps/shared/dist" ]; then
-  cp -r apps/shared/dist/* "${DEPLOY_DIR}/shared/"
+# Pare MediaMTX to target platform (lives under server in node_modules)
+VENDOR_MEDIAMTX_PATH="${SERVER_ROOT}/dist/vendor/mediamtx"
+get_mediamtx_platform() {
+    local plat="$1"
+    local a="$2"
+    if [ "$plat" = "linux" ]; then
+        if [ "$a" = "amd64" ] || [ "$a" = "x64" ]; then
+            echo "linux-amd64"
+            return
+        fi
+        if [ "$a" = "arm64" ]; then
+            echo "linux-arm64"
+            return
+        fi
+        if [ "$a" = "armhf" ] || [ "$a" = "armv7l" ]; then
+            echo "linux-armv7"
+            return
+        fi
+    fi
+    echo ""
+}
+
+MEDIAMTX_PLATFORM=$(get_mediamtx_platform "linux" "${ARCH}")
+if [ -d "${VENDOR_MEDIAMTX_PATH}" ] && [ -n "${MEDIAMTX_PLATFORM}" ]; then
+    echo "🔍 Filtering vendor/mediamtx to ${MEDIAMTX_PLATFORM}..."
+    if [ -d "${VENDOR_MEDIAMTX_PATH}" ]; then
+        for dir in "${VENDOR_MEDIAMTX_PATH}"/*; do
+            if [ -d "$dir" ]; then
+                dirname=$(basename "$dir")
+                if [ "$dirname" != "${MEDIAMTX_PLATFORM}" ]; then
+                    rm -rf "$dir"
+                fi
+            fi
+        done
+    fi
+    echo "✅ Filtered vendor/mediamtx to ${MEDIAMTX_PLATFORM} only"
+elif [ -d "${VENDOR_MEDIAMTX_PATH}" ]; then
+    echo "⚠️  Could not determine mediamtx platform for linux-${ARCH}; keeping all"
+else
+    echo "   No vendor/mediamtx found, skipping filter"
 fi
 
 # Download and extract Node.js binary
@@ -101,6 +158,7 @@ cd "${PROJECT_ROOT}"
 
 # Create package structure
 PACKAGE_ROOT="${BUILD_ROOT}/${PACKAGE_NAME}_${VERSION}_${ARCH}"
+rm -rf "${PACKAGE_ROOT}"
 mkdir -p "${PACKAGE_ROOT}${INSTALL_DIR}"
 mkdir -p "${PACKAGE_ROOT}/usr/bin"
 mkdir -p "${PACKAGE_ROOT}/etc/systemd/system"
@@ -116,118 +174,35 @@ cp -r "${NODE_DIR}/include" "${PACKAGE_ROOT}${INSTALL_DIR}/nodejs/" 2>/dev/null 
 cp -r "${NODE_DIR}/share" "${PACKAGE_ROOT}${INSTALL_DIR}/nodejs/" 2>/dev/null || true
 
 # Copy the deployed application to package structure
-echo "Copying deployed application..."
+echo "📋 Copying deployed application..."
 cp -r "${DEPLOY_DIR}"/* "${PACKAGE_ROOT}${INSTALL_DIR}/"
 
 # Move cli.js to root level for executable (if it exists)
-if [ -f "${PACKAGE_ROOT}${INSTALL_DIR}/dist/cli.js" ]; then
-  mv "${PACKAGE_ROOT}${INSTALL_DIR}/dist/cli.js" "${PACKAGE_ROOT}${INSTALL_DIR}/server-cli.js"
+if [ -f "${PACKAGE_ROOT}${INSTALL_DIR}/node_modules/@axiocnc/server/dist/cli.js" ]; then
+    cp "${PACKAGE_ROOT}${INSTALL_DIR}/node_modules/@axiocnc/server/dist/cli.js" "${PACKAGE_ROOT}${INSTALL_DIR}/server-cli.js"
 fi
 
-# Create launcher script that uses bundled Node.js
-echo "Creating launcher script..."
-cat > "${PACKAGE_ROOT}/usr/bin/axiocnc" << 'EOF'
-#!/bin/bash
-# AxioCNC Server Launcher
-# Uses bundled Node.js
-
-AXIOCNC_DIR="/opt/axiocnc"
-NODE_BIN="${AXIOCNC_DIR}/nodejs/bin/node"
-CLI_FILE="${AXIOCNC_DIR}/server-cli.js"
-LOG_DIR="${HOME}/.axiocnc/logs"
-LOG_FILE="${LOG_DIR}/axiocnc.log"
-
-# Ensure log directory exists and is writable
-if ! mkdir -p "${LOG_DIR}" 2>/dev/null || [ ! -w "${LOG_DIR}" ]; then
-    # Last resort: use /tmp if home directory is not accessible
-    LOG_DIR="/tmp/axiocnc-${USER}/logs"
-    LOG_FILE="${LOG_DIR}/axiocnc.log"
-    mkdir -p "${LOG_DIR}" 2>/dev/null || true
-    echo "Warning: Cannot write to ~/.axiocnc/logs, using ${LOG_FILE} instead" >&2
-fi
-
-# Function to log messages
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S'): $*" | tee -a "${LOG_FILE}" 2>/dev/null || echo "$(date '+%Y-%m-%d %H:%M:%S'): $*"
-}
-
-# Function to log errors
-log_error() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S'): ERROR: $*" | tee -a "${LOG_FILE}" >&2 2>/dev/null || echo "ERROR: $*" >&2
-}
-
-# Change to installation directory
-if ! cd "${AXIOCNC_DIR}"; then
-    log_error "Cannot change to ${AXIOCNC_DIR}"
+# Create launcher script from template
+echo "📝 Creating launcher script from template..."
+LAUNCHER_TEMPLATE="${PROJECT_ROOT}/apps/server/assets/axiocnc-launcher.sh.template"
+if [ ! -f "${LAUNCHER_TEMPLATE}" ]; then
+    echo "❌ Missing launcher template at ${LAUNCHER_TEMPLATE}"
     exit 1
 fi
-
-# Verify Node.js exists
-if [ ! -f "${NODE_BIN}" ]; then
-    log_error "Node.js binary not found at ${NODE_BIN}"
-    exit 1
-fi
-
-# Verify CLI file exists
-if [ ! -f "${CLI_FILE}" ]; then
-    log_error "CLI file not found at ${CLI_FILE}"
-    exit 1
-fi
-
-# Ensure --host 0.0.0.0 and --allow-remote-access are set
-ARGS=("$@")
-if [[ ! " ${ARGS[@]} " =~ " --host " ]]; then
-    ARGS+=("--host" "0.0.0.0")
-fi
-if [[ ! " ${ARGS[@]} " =~ " --allow-remote-access " ]]; then
-    ARGS+=("--allow-remote-access")
-fi
-
-# Log startup
-log "Starting AxioCNC server"
-log "Node: ${NODE_BIN}"
-log "CLI: ${CLI_FILE}"
-log "Args: ${ARGS[*]}"
-log "Working directory: $(pwd)"
-log "Logfile: ${LOG_FILE}"
-
-# Run the server with bundled Node.js
-# Capture both stdout and stderr to log file, but also show errors to user
-"${NODE_BIN}" "${CLI_FILE}" "${ARGS[@]}" >> "${LOG_FILE}" 2>&1
-EXIT_CODE=$?
-
-if [ $EXIT_CODE -ne 0 ]; then
-    log_error "Server exited with code ${EXIT_CODE}"
-    log_error "Check ${LOG_FILE} for details"
-    tail -20 "${LOG_FILE}" >&2
-    exit $EXIT_CODE
-fi
-EOF
+sed "s|{{INSTALL_DIR}}|${INSTALL_DIR}|g" "${LAUNCHER_TEMPLATE}" > "${PACKAGE_ROOT}/usr/bin/axiocnc"
 chmod +x "${PACKAGE_ROOT}/usr/bin/axiocnc"
 
-# Create systemd service file
-echo "Creating systemd service..."
-cat > "${PACKAGE_ROOT}/etc/systemd/system/axiocnc.service" << EOF
-[Unit]
-Description=AxioCNC CNC Controller Server
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${INSTALL_DIR}
-ExecStart=${INSTALL_DIR}/nodejs/bin/node ${INSTALL_DIR}/server-cli.js --port 8000 --host 0.0.0.0 --allow-remote-access
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# Create systemd service file from template
+echo "📝 Creating systemd service from template..."
+SERVICE_TEMPLATE="${PROJECT_ROOT}/apps/server/assets/axiocnc.service.template"
+if [ ! -f "${SERVICE_TEMPLATE}" ]; then
+    echo "❌ Missing service template at ${SERVICE_TEMPLATE}"
+    exit 1
+fi
+sed "s|{{INSTALL_DIR}}|${INSTALL_DIR}|g" "${SERVICE_TEMPLATE}" > "${PACKAGE_ROOT}/etc/systemd/system/axiocnc.service"
 
 # Create control file
-echo "Creating Debian control file..."
+echo "📝 Creating Debian control file..."
 cat > "${PACKAGE_ROOT}/DEBIAN/control" << EOF
 Package: ${PACKAGE_NAME}
 Version: ${VERSION}
@@ -243,23 +218,23 @@ Priority: optional
 EOF
 
 # Create post-install script
-echo "Creating post-install script..."
-cat > "${PACKAGE_ROOT}/DEBIAN/postinst" << 'EOF'
+echo "📝 Creating post-install script..."
+cat > "${PACKAGE_ROOT}/DEBIAN/postinst" << EOF
 #!/bin/bash
 set -e
 
 # Add user to dialout group for serial port access
-if [ -n "$SUDO_USER" ]; then
-    USER="$SUDO_USER"
-elif [ -n "$USER" ]; then
-    USER="$USER"
+if [ -n "\$SUDO_USER" ]; then
+    USER="\$SUDO_USER"
+elif [ -n "\$USER" ]; then
+    USER="\$USER"
 else
-    USER=$(logname 2>/dev/null || echo "")
+    USER=\$(logname 2>/dev/null || echo "")
 fi
 
-if [ -n "$USER" ] && [ "$USER" != "root" ]; then
-    echo "Adding user '$USER' to dialout group for serial port access..."
-    usermod -a -G dialout "$USER" || true
+if [ -n "\$USER" ] && [ "\$USER" != "root" ]; then
+    echo "Adding user '\$USER' to dialout group for serial port access..."
+    usermod -a -G dialout "\$USER" || true
 fi
 
 # Create log directory in user's home directory
@@ -285,6 +260,7 @@ EOF
 chmod +x "${PACKAGE_ROOT}/DEBIAN/postinst"
 
 # Create pre-remove script
+echo "📝 Creating pre-remove script..."
 cat > "${PACKAGE_ROOT}/DEBIAN/prerm" << 'EOF'
 #!/bin/bash
 # Stop service if running
@@ -294,6 +270,7 @@ EOF
 chmod +x "${PACKAGE_ROOT}/DEBIAN/prerm"
 
 # Create post-remove script
+echo "📝 Creating post-remove script..."
 cat > "${PACKAGE_ROOT}/DEBIAN/postrm" << 'EOF'
 #!/bin/bash
 # Log files are stored in ~/.axiocnc/logs and are preserved for user inspection
@@ -302,15 +279,15 @@ EOF
 chmod +x "${PACKAGE_ROOT}/DEBIAN/postrm"
 
 # Ensure output directory exists
-mkdir -p "${PROJECT_ROOT}/${OUT_DIR}"
+mkdir -p "${OUT_DIR}"
 
 # Build .deb package
-echo "Building .deb package..."
+echo "📦 Building .deb package..."
 OUTPUT_FILENAME="axiocnc-headless_${VERSION}_${ARCH}.deb"
-dpkg-deb --build "${PACKAGE_ROOT}" "${PROJECT_ROOT}/${OUT_DIR}/${OUTPUT_FILENAME}"
+dpkg-deb --build "${PACKAGE_ROOT}" "${OUT_DIR}/${OUTPUT_FILENAME}"
 
 # Get package size
-PACKAGE_SIZE=$(du -h "${PROJECT_ROOT}/${OUT_DIR}/${OUTPUT_FILENAME}" | cut -f1)
+PACKAGE_SIZE=$(du -h "${OUT_DIR}/${OUTPUT_FILENAME}" | cut -f1)
 
 echo ""
 echo "✅ Server package built: ${OUT_DIR}/${OUTPUT_FILENAME} (${PACKAGE_SIZE})"

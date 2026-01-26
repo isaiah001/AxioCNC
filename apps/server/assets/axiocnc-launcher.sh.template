@@ -1,0 +1,75 @@
+#!/bin/bash
+# AxioCNC Server Launcher
+# Uses bundled Node.js
+
+AXIOCNC_DIR="{{INSTALL_DIR}}"
+NODE_BIN="${AXIOCNC_DIR}/nodejs/bin/node"
+CLI_FILE="${AXIOCNC_DIR}/server-cli.js"
+LOG_DIR="${HOME}/.axiocnc/logs"
+LOG_FILE="${LOG_DIR}/axiocnc.log"
+
+# Ensure log directory exists and is writable
+if ! mkdir -p "${LOG_DIR}" 2>/dev/null || [ ! -w "${LOG_DIR}" ]; then
+    # Last resort: use /tmp if home directory is not accessible
+    LOG_DIR="/tmp/axiocnc-${USER}/logs"
+    LOG_FILE="${LOG_DIR}/axiocnc.log"
+    mkdir -p "${LOG_DIR}" 2>/dev/null || true
+    echo "Warning: Cannot write to ~/.axiocnc/logs, using ${LOG_FILE} instead" >&2
+fi
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S'): $*" | tee -a "${LOG_FILE}" 2>/dev/null || echo "$(date '+%Y-%m-%d %H:%M:%S'): $*"
+}
+
+# Function to log errors
+log_error() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S'): ERROR: $*" | tee -a "${LOG_FILE}" >&2 2>/dev/null || echo "ERROR: $*" >&2
+}
+
+# Change to installation directory
+if ! cd "${AXIOCNC_DIR}"; then
+    log_error "Cannot change to ${AXIOCNC_DIR}"
+    exit 1
+fi
+
+# Verify Node.js exists
+if [ ! -f "${NODE_BIN}" ]; then
+    log_error "Node.js binary not found at ${NODE_BIN}"
+    exit 1
+fi
+
+# Verify CLI file exists
+if [ ! -f "${CLI_FILE}" ]; then
+    log_error "CLI file not found at ${CLI_FILE}"
+    exit 1
+fi
+
+# Ensure --host 0.0.0.0 and --allow-remote-access are set
+ARGS=("$@")
+if [[ ! " ${ARGS[@]} " =~ " --host " ]]; then
+    ARGS+=("--host" "0.0.0.0")
+fi
+if [[ ! " ${ARGS[@]} " =~ " --allow-remote-access " ]]; then
+    ARGS+=("--allow-remote-access")
+fi
+
+# Log startup
+log "Starting AxioCNC server"
+log "Node: ${NODE_BIN}"
+log "CLI: ${CLI_FILE}"
+log "Args: ${ARGS[*]}"
+log "Working directory: $(pwd)"
+log "Logfile: ${LOG_FILE}"
+
+# Run the server with bundled Node.js
+# Capture both stdout and stderr to log file, but also show errors to user
+"${NODE_BIN}" "${CLI_FILE}" "${ARGS[@]}" >> "${LOG_FILE}" 2>&1
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    log_error "Server exited with code ${EXIT_CODE}"
+    log_error "Check ${LOG_FILE} for details"
+    tail -20 "${LOG_FILE}" >&2
+    exit $EXIT_CODE
+fi
