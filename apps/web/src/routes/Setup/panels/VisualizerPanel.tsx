@@ -279,11 +279,16 @@ export function VisualizerPanel({
   }, [modelOffset?.x, modelOffset?.y, modelOffset?.z])
   const placedGcodeRef = useRef<string | null>(null) // Track which G-code we've already auto-placed
   const loadedGcodeRef = useRef<{ name: string; gcode: string } | null>(null) // Ref for accessing current loadedGcode in event handlers
+  const machinePositionRef = useRef<{ x: number; y: number; z: number }>(machinePosition) // Ref for accessing current machinePosition in event handlers
   
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => {
     loadedGcodeRef.current = loadedGcode
   }, [loadedGcode])
+  
+  useEffect(() => {
+    machinePositionRef.current = machinePosition
+  }, [machinePosition])
   
   // Query currently loaded G-code on mount (to restore when navigating between pages)
   const { data: gcodeData, isLoading: isLoadingGcode } = useGetGcodeQuery(connectedPort || '', {
@@ -328,8 +333,10 @@ export function VisualizerPanel({
         lastRestoredApiFileRef.current = gcodeData.name
         
         // Calculate outline for visualization
-        if (gcode && machinePosition) {
-          const outlineResult = calculateOutline(gcode, machinePosition, { 
+        // Note: machinePosition is only used for generating commands, not for hull calculation
+        const currentMachinePosition = machinePositionRef.current
+        if (gcode && currentMachinePosition) {
+          const outlineResult = calculateOutline(gcode, currentMachinePosition, { 
             concavity: 5,
             minPointDistance: 5, // 5mm minimum distance between points
           })
@@ -371,6 +378,7 @@ export function VisualizerPanel({
   }, [gcodeData, isLoadingGcode])
   
   // Listen to G-code load/unload events for visualizer
+  // Note: Using refs to avoid recreating handlers when machinePosition changes
   useEffect(() => {
     // gcode:load emits (name, gcode, context) as separate arguments
     const handleGcodeLoad = (name: string, gcode: string) => {
@@ -380,8 +388,10 @@ export function VisualizerPanel({
         setLoadedGcode({ name, gcode })
         
         // Calculate outline for visualization
-        if (machinePosition) {
-          const outlineResult = calculateOutline(gcode, machinePosition, { 
+        // Note: machinePosition is only used for generating commands, not for hull calculation
+        const currentMachinePosition = machinePositionRef.current
+        if (currentMachinePosition) {
+          const outlineResult = calculateOutline(gcode, currentMachinePosition, { 
             concavity: 5,
             minPointDistance: 5, // 5mm minimum distance between points
           })
@@ -424,9 +434,11 @@ export function VisualizerPanel({
       socketService.off('gcode:load', handleGcodeLoad)
       socketService.off('gcode:unload', handleGcodeUnload)
     }
-  }, [machinePosition])
+  }, []) // Empty deps - handlers use refs to access current values
 
-  // Recalculate outline when G-code or machine position changes
+  // Recalculate outline when G-code changes
+  // Note: machinePosition is only used for generating outline commands, not for hull calculation
+  // so we don't need to recalculate when the toolhead moves
   useEffect(() => {
     if (loadedGcode?.gcode && machinePosition) {
       const outlineResult = calculateOutline(loadedGcode.gcode, machinePosition, { 
@@ -441,7 +453,7 @@ export function VisualizerPanel({
     } else {
       setOutlinePoints(null)
     }
-  }, [loadedGcode?.gcode, machinePosition?.x, machinePosition?.y, machinePosition?.z])
+  }, [loadedGcode?.gcode])
 
   // Automatically place model at WCS origin when G-code is loaded
   useEffect(() => {
