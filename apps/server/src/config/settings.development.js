@@ -10,7 +10,7 @@ export default {
       routes: [
         '' // empty path
       ],
-      path: path.resolve(__dirname, '..', '..', 'app'),
+      path: path.resolve(__dirname, '..', '..', '..', 'web', 'dist'),
       maxAge: maxAge
     }
   },

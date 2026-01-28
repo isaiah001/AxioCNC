@@ -190,7 +190,11 @@ const appMain = () => {
     log.error(err);
   }
 
-  app.use(favicon(path.join(_get(settings, 'assets.app.path', ''), 'favicon.ico')));
+  // Only use favicon middleware if favicon.ico exists
+  const faviconPath = path.join(_get(settings, 'assets.app.path', ''), 'favicon.ico');
+  if (fs.existsSync(faviconPath)) {
+    app.use(favicon(faviconPath));
+  }
   app.use(cookieParser());
 
   // Connect's body parsing middleware. This only handles urlencoded and json bodies.
