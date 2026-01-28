@@ -8,10 +8,14 @@ import { socketService } from '@/services/socket'
 import { machineStateSync } from '@/services/machineStateSync'
 import { initializeAnalytics, track, isEnabled } from '@/services/analytics'
 import { getAptabaseKey } from '@/config/analytics'
+import packageJson from '../package.json'
 import Settings from '@/routes/Settings'
 import Setup from '@/routes/Setup'
 import Monitor from '@/routes/Monitor'
 import Stats from '@/routes/Stats'
+
+// App version - loaded from package.json at build time
+export const APP_VERSION = packageJson.version
 
 function App() {
   const [signIn] = useSignInMutation()
@@ -83,21 +87,25 @@ function App() {
     }
   }, [signIn])
 
+  // Log app version at startup
+  useEffect(() => {
+    console.log(`[App] Starting AxioCNC v${APP_VERSION}`)
+  }, [])
+
   // Initialize analytics
   useEffect(() => {
     try {
       const appKey = getAptabaseKey()
       const userEnabled = settings?.allowAnonymousUsageDataCollection ?? false
-      const appVersion = '0.0.50' // TODO: Get from package.json or API
       
-      initializeAnalytics(appKey, userEnabled, appVersion)
+      initializeAnalytics(appKey, userEnabled, APP_VERSION)
       
       if (isEnabled()) {
         // Detect platform (electron vs web)
         const isElectron = typeof window !== 'undefined' && 'electron' in window
         const platform = isElectron ? 'electron' : 'web'
         track('app_started', {
-          version: appVersion,
+          version: APP_VERSION,
           platform,
         })
       }

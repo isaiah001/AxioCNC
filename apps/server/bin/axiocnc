@@ -1,9 +1,19 @@
 #!/usr/bin/env node
 
-const launchServer = (process.env.NODE_ENV === 'development')
-  ? require('../../../build/dev/server/axiocnc/server-cli')
-  : require('../../../dist/axiocnc/server-cli');
-
-launchServer().catch(err => {
-  console.error('Error:', err);
-});
+// In development, use babel-register to run from source
+if (process.env.NODE_ENV === 'development') {
+  require('@babel/register');
+  const launchServer = require('../src/cli');
+  launchServer().catch(err => {
+    console.error('Error:', err);
+  });
+} else {
+  // Production: use compiled output from dist/cli.js
+  // Works from both:
+  // - apps/server/bin/axiocnc -> ../dist/cli.js -> apps/server/dist/cli.js
+  // - bin/axiocnc (after pnpm deploy) -> ../dist/cli.js -> dist/cli.js
+  const launchServer = require('../dist/cli');
+  launchServer().catch(err => {
+    console.error('Error:', err);
+  });
+}

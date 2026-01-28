@@ -59,8 +59,8 @@ RUN mkdir -p /build/deploy/app /build/deploy/shared \
     && cp -r apps/web/dist/. /build/deploy/app/ \
     && cp -r apps/shared/dist/. /build/deploy/shared/
 
-# Move cli.js to root as server-cli.js (same as package-headless)
-RUN mv /build/deploy/dist/cli.js /build/deploy/server-cli.js
+# Note: cli.js is used directly from dist/cli.js (no rename needed)
+# Entrypoint references /opt/axiocnc/dist/cli.js
 
 # Download and extract Node.js 20.18.0 linux-x64 (match package-headless)
 ARG NODE_VERSION=20.18.0
@@ -102,5 +102,5 @@ LABEL org.opencontainers.image.vendor="AxioCNC"
 LABEL org.opencontainers.image.version="$VERSION"
 LABEL org.opencontainers.image.url="https://axiocnc.com"
 
-ENTRYPOINT ["/opt/axiocnc/nodejs/bin/node", "server-cli.js"]
+ENTRYPOINT ["/opt/axiocnc/nodejs/bin/node", "dist/cli.js"]
 CMD ["--port", "8000", "--host", "0.0.0.0", "--allow-remote-access"]

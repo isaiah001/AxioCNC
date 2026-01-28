@@ -5,7 +5,7 @@
   "homepage": "https://github.com/rsteckler/axiocnc",
   "author": "Cheton Wu <cheton@gmail.com>",
   "maintainer": "Ryan Steckler <admin@axiocnc.com>",
-  "main": "./dist/axiocnc/server-cli.js",
+  "main": "./dist/cli.js",
   "bin": "./apps/server/bin/axiocnc",
   "files": [
     "apps/server/bin",

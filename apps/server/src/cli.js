@@ -33,9 +33,11 @@ if (fs.existsSync(envLocalPath)) {
 // have native support for all ECMAScript features and async/await
 const isElectron = require('is-electron');
 const program = require('commander');
-// In dev/prod builds, package.json is copied alongside the compiled server-cli.js
+// In dev/prod builds, package.json is one level up from cli.js
+// - Development: apps/server/src/cli.js -> ../package.json -> apps/server/package.json
+// - Production: dist/cli.js -> ../package.json -> package.json (at install root)
 // eslint-disable-next-line import/no-unresolved
-const pkg = require('./package.json');
+const pkg = require('../package.json');
 
 // Defaults to 'production'
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
@@ -125,16 +127,16 @@ const options = program.opts();
 const launchServer = () => new Promise((resolve, reject) => {
   // Server code location depends on build structure:
   // - In Electron packaged deployment: cli.js is in dist/, server code is at ./index (same dir)
-  // - In production: server-cli.js is at root, server code is at ./server/
-  // - In dev build: cli.js is in server/, server code is at ./
+  // - In production: cli.js is in dist/, server code is at ./index (same dir)
+  // - In dev build: cli.js is in src/, server code is at ./index (same dir)
   // Detect location by checking file structure
-  const isInServerDir = __filename.includes('/server/cli.js') || __filename.includes('\\server\\cli.js');
+  const isInSourceDir = __filename.includes('/src/cli.js') || __filename.includes('\\src\\cli.js');
   const isInDistDir = __filename.includes('/dist/cli.js') || __filename.includes('\\dist\\cli.js');
   const hasDistIndex = require('fs').existsSync('./dist/index.js');
   let serverIndexPath;
   if (isInDistDir) {
     serverIndexPath = './index'; // Electron packaged deployment - cli.js is in dist/, index.js is in same dir
-  } else if (isInServerDir) {
+  } else if (isInSourceDir) {
     serverIndexPath = './index'; // dev build
   } else if (hasDistIndex) {
     serverIndexPath = './dist/index'; // legacy production build

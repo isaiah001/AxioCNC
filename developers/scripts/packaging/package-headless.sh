@@ -178,11 +178,8 @@ cp -r "${NODE_DIR}/share" "${PACKAGE_ROOT}${INSTALL_DIR}/nodejs/" 2>/dev/null ||
 echo "📋 Copying deployed application..."
 cp -r "${DEPLOY_DIR}"/* "${PACKAGE_ROOT}${INSTALL_DIR}/"
 
-# Move cli.js to root level for executable (if it exists)
-# pnpm deploy puts the package at the root level, not in node_modules
-if [ -f "${PACKAGE_ROOT}${INSTALL_DIR}/dist/cli.js" ]; then
-    cp "${PACKAGE_ROOT}${INSTALL_DIR}/dist/cli.js" "${PACKAGE_ROOT}${INSTALL_DIR}/server-cli.js"
-fi
+# Note: cli.js is used directly from dist/cli.js (no rename needed)
+# Systemd and launcher scripts reference {{INSTALL_DIR}}/dist/cli.js
 
 # Create launcher script from template
 echo "📝 Creating launcher script from template..."

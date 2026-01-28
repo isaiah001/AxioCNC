@@ -4,7 +4,7 @@
 
 AXIOCNC_DIR="{{INSTALL_DIR}}"
 NODE_BIN="${AXIOCNC_DIR}/nodejs/bin/node"
-CLI_FILE="${AXIOCNC_DIR}/server-cli.js"
+CLI_FILE="${AXIOCNC_DIR}/dist/cli.js"
 LOG_DIR="${HOME}/.axiocnc/logs"
 LOG_FILE="${LOG_DIR}/axiocnc.log"
 
