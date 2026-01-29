@@ -58,6 +58,7 @@ body:
       label: AxioCNC Version
       description: What version of AxioCNC are you using?
       options:
+        - "0.0.87"
         - "0.0.86"
         - "Older version"
     validations:
