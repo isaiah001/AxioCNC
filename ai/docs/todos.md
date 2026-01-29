@@ -12,12 +12,10 @@ test platfroms
 
 
 ## Later
-improve screenshots
 First use
 
 - [ ] Move the gcode into the server and abstract it with commands
 - [ ] Widget system
-i18n
 add automatic pulling of bed size and speeds from $$ and spindle speed
 Figure out how to allow typing for spindle speed, steps movement, joystick speed, etc
 
