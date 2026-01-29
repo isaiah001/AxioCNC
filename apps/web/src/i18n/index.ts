@@ -114,6 +114,7 @@ export const i18nReady = i18n
 
     fallbackLng: 'en',
     supportedLngs: supportedLanguages as unknown as string[],
+    lowerCaseLng: true, // keep zh-cn/zh-tw etc. so paths and resource bundles match
 
     ns: ['controller', 'gcode', 'resource'],
     defaultNS: 'resource',
