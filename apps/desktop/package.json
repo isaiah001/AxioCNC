@@ -4,7 +4,7 @@
   "description": "AxioCNC Desktop - Electron wrapper for the CNC control server",
   "author": "Ryan Steckler <axiocnc@ryansinbox.com>",
   "homepage": "https://github.com/rsteckler/axiocnc",
-  "main": "dist/main.js",
+  "main": "dist/bootstrap.js",
   "private": true,
   "scripts": {
     "build": "pnpm run build:clean && pnpm run build:compile",
