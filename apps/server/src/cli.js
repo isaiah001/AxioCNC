@@ -161,6 +161,10 @@ const launchServer = () => new Promise((resolve, reject) => {
       return;
     }
 
+    // When run as child of Electron desktop, notify parent of address/port for loadURL
+    if (typeof process.send === 'function') {
+      process.send({ type: 'server-started', ...data });
+    }
     resolve(data);
   });
 });

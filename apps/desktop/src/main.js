@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import {
   BrowserWindow,
   Menu,
@@ -63,30 +64,6 @@ function getMenuTemplates() {
   }
   // eslint-disable-next-line import/no-dynamic-require, global-require
   return require(path.join(__dirname, 'menu-template'));
-}
-
-// Load launchServer from node_modules/@axiocnc/server (server runs from its package root)
-function getLaunchServer(bundleRoot) {
-  const serverRoot = path.join(bundleRoot, 'node_modules', '@axiocnc', 'server');
-  const cliPath = path.join(serverRoot, 'dist', 'cli.js');
-  if (!fs.existsSync(cliPath)) {
-    throw new Error(`Missing server cli.js at: ${cliPath}`);
-  }
-
-  try {
-    process.chdir(serverRoot);
-  } catch (e) {
-    console.warn(`Warning: could not chdir to ${serverRoot}`, e);
-  }
-
-  // eslint-disable-next-line import/no-dynamic-require, global-require
-  const mod = require(cliPath);
-
-  if (typeof mod === 'function') {
-    return mod;
-  }
-
-  throw new Error(`server dist/cli.js did not export a function: ${cliPath}`);
 }
 
 const pkg = getDesktopPackageJson();
@@ -258,7 +235,7 @@ function showMainWindowDev() {
   });
 }
 
-const showMainWindow = async () => {
+const showMainWindow = () => {
   if (isDevMode()) {
     showMainWindowDev();
     return;
@@ -287,24 +264,58 @@ const showMainWindow = async () => {
     }
   }
 
-  const launchServer = getLaunchServer(bundleRoot);
+  const cliPath = path.join(serverRoot, 'dist', 'cli.js');
+  const serverProcess = spawn(process.execPath, [cliPath, '--port', '0', '--host', '127.0.0.1'], {
+    cwd: bundleRoot,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+  });
+
+  serverProcess.stdout.on('data', (data) => {
+    console.log('[server]', data.toString().trim());
+  });
+  serverProcess.stderr.on('data', (data) => {
+    console.error('[server]', data.toString().trim());
+  });
+  serverProcess.on('error', (err) => {
+    console.error('[main] server process error:', err);
+  });
+  serverProcess.on('exit', (code, signal) => {
+    if (code != null && code !== 0) {
+      console.error('[main] server process exited with code', code);
+    }
+  });
+
+  let inputMenuRef = null;
+  let selectionMenuRef = null;
 
   const browserWindowOptions = getBrowserWindowOptions();
   const browserWindow = new BrowserWindow(browserWindowOptions);
   mainWindow = browserWindow;
   powerId = powerSaveBlocker.start('prevent-display-sleep');
 
-  const res = await launchServer();
-  const { address, port, mountPoints } = { ...res };
-  if (!(address && port)) {
-    console.error('Unable to start the server at ' + chalk.cyan(`http://${address}:${port}`));
-    return;
-  }
+  serverProcess.on('message', (msg) => {
+    if (msg.type !== 'server-started' || !mainWindow) {
+      return;
+    }
+    const { address, port, mountPoints = [] } = msg;
+    if (!(address && port)) {
+      return;
+    }
 
-  const applicationMenu = Menu.buildFromTemplate(createApplicationMenuTemplate({ address, port, mountPoints }));
-  const inputMenu = Menu.buildFromTemplate(inputMenuTemplate);
-  const selectionMenu = Menu.buildFromTemplate(selectionMenuTemplate);
-  Menu.setApplicationMenu(applicationMenu);
+    const applicationMenu = Menu.buildFromTemplate(createApplicationMenuTemplate({ address, port, mountPoints }));
+    inputMenuRef = Menu.buildFromTemplate(inputMenuTemplate);
+    selectionMenuRef = Menu.buildFromTemplate(selectionMenuTemplate);
+    Menu.setApplicationMenu(applicationMenu);
+
+    mainWindow.webContents.session.setProxy({ proxyRules: 'direct://' })
+      .then(() => {
+        mainWindow.loadURL(`http://${address}:${port}`);
+      })
+      .catch((err) => {
+        console.error('[main] setProxy/loadURL:', err.message);
+      });
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -321,22 +332,12 @@ const showMainWindow = async () => {
 
   mainWindow.webContents.on('context-menu', (event, props) => {
     const { selectionText, isEditable } = props;
-    if (isEditable) {
-      inputMenu.popup(mainWindow);
-    } else if (selectionText && String(selectionText).trim() !== '') {
-      selectionMenu.popup(mainWindow);
+    if (isEditable && inputMenuRef) {
+      inputMenuRef.popup(mainWindow);
+    } else if (selectionText && String(selectionText).trim() !== '' && selectionMenuRef) {
+      selectionMenuRef.popup(mainWindow);
     }
   });
-
-  const webContentsSession = mainWindow.webContents.session;
-  webContentsSession.setProxy({ proxyRules: 'direct://' })
-    .then(() => {
-      const url = `http://${address}:${port}`;
-      mainWindow.loadURL(url);
-    })
-    .catch(err => {
-      console.log('err', err.message);
-    });
 
   if (process.platform === 'win32') {
     mainWindow.show();
@@ -347,6 +348,7 @@ const showMainWindow = async () => {
   }
 
   mainWindow.on('close', () => {
+    serverProcess.kill();
     const bounds = mainWindow.getBounds();
     const display = screen.getDisplayMatching(bounds);
     const options = {

@@ -26,4 +26,4 @@ if (app.isPackaged) {
   };
 }
 
-require('./main.js');
+require('./main');

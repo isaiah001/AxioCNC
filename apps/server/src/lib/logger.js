@@ -14,8 +14,6 @@ const getStackTrace = () => {
 
 const VERBOSITY_MAX = 3; // -vvv
 
-const { combine, colorize, timestamp, printf } = winston.format;
-
 // Get home directory and set up log file path
 const getUserHome = () => (process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME']);
 const homeDir = getUserHome();
@@ -32,38 +30,44 @@ if (homeDir) {
   }
 }
 
-// https://github.com/winstonjs/winston/blob/master/README.md#creating-your-own-logger
-const transports = [
-  new winston.transports.Console({
-    format: combine(
-      colorize(),
-      timestamp(),
-      printf(log => `${log.timestamp} - ${log.level} ${log.message}`)
-    ),
-    handleExceptions: true
-  })
-];
-
-// Add file transport if log directory is accessible
-if (homeDir && fs.existsSync(logDir)) {
-  transports.push(
-    new winston.transports.File({
-      filename: logFile,
-      format: combine(
-        timestamp(),
-        printf(log => `${log.timestamp} - ${log.level} ${log.message}`)
+// Lazy-init logger so winston.format is accessed after any circular deps resolve
+// (avoids "Cannot read properties of undefined (reading 'combine')" in packaged desktop)
+let logger = null;
+function ensureLogger() {
+  if (logger) {
+    return logger;
+  }
+  const fmt = winston.format;
+  const transports = [
+    new winston.transports.Console({
+      format: fmt.combine(
+        fmt.colorize(),
+        fmt.timestamp(),
+        fmt.printf(log => `${log.timestamp} - ${log.level} ${log.message}`)
       ),
       handleExceptions: true
     })
-  );
+  ];
+  if (homeDir && fs.existsSync(logDir)) {
+    transports.push(
+      new winston.transports.File({
+        filename: logFile,
+        format: fmt.combine(
+          fmt.timestamp(),
+          fmt.printf(log => `${log.timestamp} - ${log.level} ${log.message}`)
+        ),
+        handleExceptions: true
+      })
+    );
+  }
+  logger = winston.createLogger({
+    exitOnError: false,
+    level: settings.winston.level,
+    silent: false,
+    transports
+  });
+  return logger;
 }
-
-const logger = winston.createLogger({
-  exitOnError: false,
-  level: settings.winston.level,
-  silent: false,
-  transports: transports
-});
 
 // https://github.com/winstonjs/winston/blob/master/README.md#logging-levels
 // npm logging levels are prioritized from 0 to 5 (highest to lowest):
@@ -76,13 +80,14 @@ export const levels = [
   'silly', // 5
 ];
 
-export const getLevel = () => logger.level;
+export const getLevel = () => ensureLogger().level;
 export const setLevel = (level) => {
-  logger.level = level;
+  ensureLogger().level = level;
 };
 
 export default (namespace = '') => {
   namespace = String(namespace);
+  const log = ensureLogger();
 
   return levels.reduce((acc, level) => {
     acc[level] = function(...args) {
@@ -90,8 +95,8 @@ export default (namespace = '') => {
         args = args.concat(getStackTrace()[2]);
       }
       return (namespace.length > 0)
-        ? logger[level](chalk.cyan(namespace) + ' ' + util.format(...args))
-        : logger[level](util.format(...args));
+        ? log[level](chalk.cyan(namespace) + ' ' + util.format(...args))
+        : log[level](util.format(...args));
     };
     return acc;
   }, {});
