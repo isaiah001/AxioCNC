@@ -313,6 +313,9 @@ paths:
    * This helps recover from crashes or incomplete shutdowns
    */
   cleanupStaleProcesses() {
+    if (process.platform === 'win32') {
+      return; // Uses lsof/ps/kill - Unix only
+    }
     try {
       const { execSync } = require('child_process');
       
@@ -443,32 +446,34 @@ paths:
 
     // Check for port conflicts (MediaMTX uses ports 8002/UDP for RTP, 8003/UDP for RTCP, 8554/TCP for RTSP, 8888/TCP for HLS)
     // Note: Ports 8000/8001 UDP were changed to 8002/8003 UDP to avoid conflict with AxioCNC server on port 8000
-    // This is a best-effort check - MediaMTX will still fail if ports are in use
-    const checkPort = (port, protocol = 'tcp') => {
-      try {
-        const { execSync } = require('child_process');
-        const result = execSync(`lsof -i ${protocol === 'udp' ? 'UDP' : 'TCP'}:${port} 2>/dev/null || true`, { encoding: 'utf8' });
-        if (result.trim()) {
-          log.warn(`Port ${port} (${protocol.toUpperCase()}) appears to be in use:`);
-          result.split('\n').filter(l => l.trim()).forEach(line => {
-            log.warn(`  ${line}`);
-          });
-          return true;
+    // This is a best-effort check - MediaMTX will still fail if ports are in use (lsof is Unix only)
+    let portsInUse = [];
+    if (process.platform !== 'win32') {
+      const checkPort = (port, protocol = 'tcp') => {
+        try {
+          const { execSync } = require('child_process');
+          const result = execSync(`lsof -i ${protocol === 'udp' ? 'UDP' : 'TCP'}:${port} 2>/dev/null || true`, { encoding: 'utf8' });
+          if (result.trim()) {
+            log.warn(`Port ${port} (${protocol.toUpperCase()}) appears to be in use:`);
+            result.split('\n').filter(l => l.trim()).forEach(line => {
+              log.warn(`  ${line}`);
+            });
+            return true;
+          }
+          return false;
+        } catch (err) {
+          // lsof might not be available, ignore
+          return false;
         }
-        return false;
-      } catch (err) {
-        // lsof might not be available, ignore
-        return false;
-      }
-    };
+      };
 
-    log.debug('Checking for port conflicts...');
-    const portsInUse = [];
-    if (checkPort(8002, 'udp')) portsInUse.push('8002/udp');
-    if (checkPort(8003, 'udp')) portsInUse.push('8003/udp');
-    if (checkPort(8554, 'tcp')) portsInUse.push('8554/tcp');
-    if (checkPort(8888, 'tcp')) portsInUse.push('8888/tcp');
-    
+      log.debug('Checking for port conflicts...');
+      if (checkPort(8002, 'udp')) portsInUse.push('8002/udp');
+      if (checkPort(8003, 'udp')) portsInUse.push('8003/udp');
+      if (checkPort(8554, 'tcp')) portsInUse.push('8554/tcp');
+      if (checkPort(8888, 'tcp')) portsInUse.push('8888/tcp');
+    }
+
     if (portsInUse.length > 0) {
       log.warn(`⚠️  MediaMTX ports appear to be in use: ${portsInUse.join(', ')}`);
       log.warn(`   MediaMTX may fail to start. Check for other MediaMTX instances or conflicting services.`);

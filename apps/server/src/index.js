@@ -270,10 +270,10 @@ const createServer = (options, callback) => {
       // Initialize analytics service
       log.debug('Initializing analytics service...');
       analytics.initialize();
-      
+
       // Track server start time for uptime calculation
       const serverStartTime = Date.now();
-      
+
       if (analytics.isEnabled()) {
         log.info('Analytics enabled - tracking server_started event');
         analytics.track('server_started', {
@@ -284,15 +284,22 @@ const createServer = (options, callback) => {
       } else {
         log.debug('Analytics disabled (key missing or user has not enabled)');
       }
-      
+
       // Setup graceful shutdown handlers
       const shutdownHandler = (signal) => {
         return () => {
+          if (process.__shutdownInProgress) {
+            return;
+          }
+          process.__shutdownInProgress = true;
           log.info(`Received ${signal}, shutting down gracefully...`);
-          
+
+          // Stop MediaMTX first so it releases ports (avoids "port in use" on next app start)
+          mediamtxService.stop();
+
           // Calculate uptime in seconds
           const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
-          
+
           // Track server shutdown
           if (analytics.isEnabled()) {
             try {
@@ -307,27 +314,35 @@ const createServer = (options, callback) => {
               log.warn('Failed to track server shutdown:', err);
             }
           }
-          
-          // Give analytics a moment to send, then exit
+
+          // Give MediaMTX time to release ports, then exit
           setTimeout(() => {
             process.exit(0);
-          }, 1000);
+          }, 2000);
         };
       };
-      
+
       // Register shutdown handlers (only once per process)
       if (!process.__shutdownHandlersRegistered) {
         process.on('SIGTERM', shutdownHandler('SIGTERM'));
         process.on('SIGINT', shutdownHandler('SIGINT'));
+        // When run as child of Electron desktop, parent sends IPC shutdown so we stop MediaMTX
+        if (typeof process.send === 'function') {
+          process.on('message', (msg) => {
+            if (msg && msg.type === 'shutdown') {
+              shutdownHandler('ipc')();
+            }
+          });
+        }
         process.__shutdownHandlersRegistered = true;
       }
-      
+
       // Handle uncaught exceptions and unhandled rejections
       process.on('uncaughtException', (err) => {
         log.error('Uncaught exception:', err);
         shutdownHandler('uncaughtException')();
       });
-      
+
       process.on('unhandledRejection', (reason, promise) => {
         log.error('Unhandled rejection at:', promise, 'reason:', reason);
         shutdownHandler('unhandledRejection')();

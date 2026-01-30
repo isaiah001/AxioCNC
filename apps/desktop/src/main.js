@@ -348,7 +348,22 @@ const showMainWindow = () => {
   }
 
   mainWindow.on('close', () => {
-    serverProcess.kill();
+    // Ask server to shut down gracefully (stops MediaMTX so ports are released)
+    if (serverProcess.connected) {
+      serverProcess.send({ type: 'shutdown' });
+      const forceKill = setTimeout(() => {
+        try {
+          serverProcess.kill('SIGKILL');
+        } catch (e) {
+          // Process may already be gone
+        }
+      }, 4000);
+      serverProcess.once('exit', () => {
+        clearTimeout(forceKill);
+      });
+    } else {
+      serverProcess.kill();
+    }
     const bounds = mainWindow.getBounds();
     const display = screen.getDisplayMatching(bounds);
     const options = {
