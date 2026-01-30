@@ -26,6 +26,12 @@ function formatCountdown(seconds: number): string {
   return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `0:${s.toString().padStart(2, '0')}`
 }
 
+function formatWarmupDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return s > 0 ? `${m}m${s}s` : `${m}m`
+}
+
 export function SpindlePanel({ 
   isConnected, 
   connectedPort, 
@@ -53,6 +59,9 @@ export function SpindlePanel({
   const warmupMinRpm = warmupConfig?.minRpm ?? 8000
   const warmupMaxRpm = warmupConfig?.maxRpm ?? 24000
   const warmupStepRpm = Math.max(100, warmupConfig?.stepRpm ?? 2000)
+  const warmupTotalSeconds = warmupEnabled
+    ? getWarmupSpeeds(warmupMinRpm, warmupMaxRpm, warmupStepRpm).length * warmupTimeSeconds
+    : 0
 
   const [isWarmupRunning, setIsWarmupRunning] = useState(false)
   const [warmupRemainingSeconds, setWarmupRemainingSeconds] = useState(0)
@@ -171,12 +180,13 @@ export function SpindlePanel({
   
   const [speedIndex, setSpeedIndex] = useState(() => getSpeedIndex(spindleSpeed))
   
-  // Sync slider to backend speed whenever it changes (e.g. during warmup or after start/stop)
+  // Sync slider from backend only when spindle is on (real reported speed).
+  // When spindle is off, keep user's chosen speed so it doesn't bounce back to controller default (e.g. 8k).
   useEffect(() => {
-    if (spindleSpeed !== undefined) {
+    if (isOn && spindleSpeed !== undefined) {
       setSpeedIndex(getSpeedIndex(spindleSpeed))
     }
-  }, [spindleSpeed, getSpeedIndex])
+  }, [isOn, spindleSpeed, getSpeedIndex])
   
   const speed = speeds[speedIndex]
   
@@ -326,6 +336,31 @@ export function SpindlePanel({
         </div>
       </div>
       
+      {/* On/Off toggle - hidden while warmup is running */}
+      {!isWarmupRunning && (
+        <MachineActionButton
+          isConnected={isConnected}
+          connectedPort={connectedPort}
+          machineStatus={machineStatus}
+          onFlashStatus={onFlashStatus}
+          onAction={handleToggleSpindle}
+          requirements={isOn ? ActionRequirements.allowHold : {
+            requiresConnected: true,
+            requiresPort: true,
+            disallowAlarm: true,
+            disallowRunning: false, // Allow spindle start during jobs (but not during hold)
+            disallowHold: true, // Don't allow starting spindle during hold
+            disallowNotConnected: true,
+          }}
+          customDisabled={!isOn && (isJobRunning && machineStatus !== 'hold')} // Allow stop during hold, disable start during other running states
+          className={`w-full h-12 ${isOn ? 'bg-green-600 hover:bg-green-700' : ''}`}
+          variant={isOn ? 'default' : 'outline'}
+        >
+          <Circle className={`w-4 h-4 mr-2 ${isOn ? 'fill-white' : ''}`} />
+          {isOn ? t('Stop Spindle') : t('Start Spindle')}
+        </MachineActionButton>
+      )}
+
       {/* Spindle warmup (VFD) - when enabled in Machine settings */}
       {warmupEnabled && (
         <div className="space-y-1">
@@ -363,40 +398,15 @@ export function SpindlePanel({
                 disallowHold: true,
                 disallowNotConnected: true,
               }}
-              customDisabled={isJobRunning}
+              customDisabled={isJobRunning || isOn}
               className="w-full h-12"
               variant="outline"
             >
               <ThermometerSun className="w-4 h-4 mr-2" />
-              {t('Warmup Spindle')}
+              {t('Warmup Spindle')} ({formatWarmupDuration(warmupTotalSeconds)})
             </MachineActionButton>
           )}
         </div>
-      )}
-
-      {/* On/Off toggle - hidden while warmup is running */}
-      {!isWarmupRunning && (
-        <MachineActionButton
-          isConnected={isConnected}
-          connectedPort={connectedPort}
-          machineStatus={machineStatus}
-          onFlashStatus={onFlashStatus}
-          onAction={handleToggleSpindle}
-          requirements={isOn ? ActionRequirements.allowHold : {
-            requiresConnected: true,
-            requiresPort: true,
-            disallowAlarm: true,
-            disallowRunning: false, // Allow spindle start during jobs (but not during hold)
-            disallowHold: true, // Don't allow starting spindle during hold
-            disallowNotConnected: true,
-          }}
-          customDisabled={!isOn && (isJobRunning && machineStatus !== 'hold')} // Allow stop during hold, disable start during other running states
-          className={`w-full h-12 ${isOn ? 'bg-green-600 hover:bg-green-700' : ''}`}
-          variant={isOn ? 'default' : 'outline'}
-        >
-          <Circle className={`w-4 h-4 mr-2 ${isOn ? 'fill-white' : ''}`} />
-          {isOn ? t('Stop Spindle') : t('Start Spindle')}
-        </MachineActionButton>
       )}
     </div>
   )
