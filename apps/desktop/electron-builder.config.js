@@ -32,16 +32,15 @@ module.exports = {
       to: 'axiocnc/package.json',
     },
   ],
+  // Only pack desktop main process (dist + package.json). node_modules live in
+  // extraResources (axiocnc/node_modules); server runs from there, not from asar.
   files: [
     'dist/**/*',
     'package.json',
-    // FileSet avoids getMainFileMatchers adding !**/node_modules/** (which excludes
-    // node_modules from main matcher). We skip the collector, so we must pack it ourselves.
-    { from: 'node_modules', to: 'node_modules', filter: ['**/*'] },
   ],
   beforeBuild: async () => {
-    // Skip install/rebuild and electron-builder's pnpm collector. We pack existing
-    // node_modules from app staging (pnpm deploy). See ai/docs/electron-builder-pnpm-root-cause.md.
+    // Skip install/rebuild and electron-builder's pnpm collector. See
+    // ai/docs/electron-builder-pnpm-root-cause.md.
     return false;
   },
   asar: true,
