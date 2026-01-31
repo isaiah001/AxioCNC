@@ -280,10 +280,10 @@ chmod +x "${PACKAGE_ROOT}/DEBIAN/postrm"
 # Ensure output directory exists
 mkdir -p "${OUT_DIR}"
 
-# Build .deb package
-echo "📦 Building .deb package..."
+# Build .deb package (legacy gzip for broad compatibility)
+echo "📦 Building .deb package (gzip)..."
 OUTPUT_FILENAME="axiocnc-headless_${VERSION}_${ARCH}.deb"
-dpkg-deb --build "${PACKAGE_ROOT}" "${OUT_DIR}/${OUTPUT_FILENAME}"
+dpkg-deb -Zgzip --build "${PACKAGE_ROOT}" "${OUT_DIR}/${OUTPUT_FILENAME}"
 
 # Get package size
 PACKAGE_SIZE=$(du -h "${OUT_DIR}/${OUTPUT_FILENAME}" | cut -f1)
