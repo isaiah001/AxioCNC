@@ -29,16 +29,16 @@ Download from [GitHub Releases](https://github.com/rsteckler/AxioCNC/releases) o
    For Raspberry Pi 4 / 5 (64-bit):
    ```bash
    cd ~
-   curl -L -o axiocnc_0.0.87_arm64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.87/axiocnc_0.0.87_arm64.deb
-   sudo dpkg -i axiocnc_0.0.87_arm64.deb
+   curl -L -o axiocnc_0.0.88_arm64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.88/axiocnc_0.0.88_arm64.deb
+   sudo dpkg -i axiocnc_0.0.88_arm64.deb
    sudo apt-get install -f   # if dependencies are missing
    ```
 
    For Raspberry Pi 3 / 4 (32-bit):
    ```bash
    cd ~
-   curl -L -o axiocnc_0.0.87_armv7l.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.87/axiocnc_0.0.87_armv7l.deb
-   sudo dpkg -i axiocnc_0.0.87_armv7l.deb
+   curl -L -o axiocnc_0.0.88_armv7l.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.88/axiocnc_0.0.88_armv7l.deb
+   sudo dpkg -i axiocnc_0.0.88_armv7l.deb
    sudo apt-get install -f   # if dependencies are missing
    ```
 

@@ -14,8 +14,8 @@ For Linux **with** a desktop, use [Linux Desktop](./linux) instead.
 1. **Download and install the package**
 
    ```bash
-   curl -L -o axiocnc-headless_0.0.87_amd64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.87/axiocnc-headless_0.0.87_amd64.deb
-   sudo dpkg -i axiocnc-headless_0.0.87_amd64.deb
+   curl -L -o axiocnc-headless_0.0.88_amd64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.88/axiocnc-headless_0.0.88_amd64.deb
+   sudo dpkg -i axiocnc-headless_0.0.88_amd64.deb
    sudo apt-get install -f
    ```
 

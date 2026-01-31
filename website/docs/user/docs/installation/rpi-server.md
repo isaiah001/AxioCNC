@@ -15,15 +15,15 @@ For a Pi **with** a desktop, use [Raspberry Pi](./rpi) instead.
 
    For Raspberry Pi 3+ (64-bit):
    ```bash
-   curl -L -o axiocnc-headless_0.0.87_arm64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.87/axiocnc-headless_0.0.87_arm64.deb
-   sudo dpkg -i axiocnc-headless_0.0.87_arm64.deb
+   curl -L -o axiocnc-headless_0.0.88_arm64.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.88/axiocnc-headless_0.0.88_arm64.deb
+   sudo dpkg -i axiocnc-headless_0.0.88_arm64.deb
    sudo apt-get install -f
    ```
 
    For Raspberry Pi 1-2 (32-bit ARMhf):
    ```bash
-   curl -L -o axiocnc-headless_0.0.87_armhf.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.87/axiocnc-headless_0.0.87_armhf.deb
-   sudo dpkg -i axiocnc-headless_0.0.87_armhf.deb
+   curl -L -o axiocnc-headless_0.0.88_armhf.deb https://github.com/rsteckler/AxioCNC/releases/download/v0.0.88/axiocnc-headless_0.0.88_armhf.deb
+   sudo dpkg -i axiocnc-headless_0.0.88_armhf.deb
    sudo apt-get install -f
    ```
 
