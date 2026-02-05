@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto place model after zeroing** — After you set X, Y, or Z zero in the setup wizard, the 3D view automatically repositions the loaded model to match the new work zero.
 - **Debug options** — In the Debug panel you can enable “Allow next toolchange screen” to step through setup and tool change screens without completing each step (for testing).
 - **Updated help and translations** — Documentation and translated text for the new setup and zeroing options.
+- **Machine Preset** - Added Shapeoko Pro XXL
 
 ### Changed
 
