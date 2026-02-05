@@ -2,5 +2,5 @@
 set -e
 TMPFILE=$(mktemp)
 trap "rm -f $TMPFILE" EXIT
-curl -L https://github.com/rsteckler/AxioCNC/releases/download/v0.0.88/axiocnc-headless_0.0.88_amd64.deb -o "$TMPFILE"
+curl -L https://github.com/rsteckler/AxioCNC/releases/download/v0.0.89/axiocnc-headless_0.0.89_amd64.deb -o "$TMPFILE"
 sudo dpkg -i "$TMPFILE"
