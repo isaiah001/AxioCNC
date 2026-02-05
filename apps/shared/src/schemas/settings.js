@@ -118,23 +118,28 @@ export const BitSetterMethodSchema = BaseMethodSchema.extend({
   requireCheck: z.boolean().default(true),
 });
 
-// BitZero - corner/edge/center probe (XYZ)
+// BitZero - corner/edge/center probe (XYZ, XY only, or Z only — one hardware yields three composable methods)
 export const BitZeroMethodSchema = BaseMethodSchema.extend({
   type: z.literal('bitzero'),
+  axes: z.enum(['xyz', 'xy', 'z']),
   probeThickness: z.number().default(12.7),
   probeFeedrate: z.number().default(100),
   probeDistance: z.number().default(25),
   requireCheck: z.boolean().default(true),
 });
 
-// Touch Plate - simple Z touch plate
+// Touch Plate - one hardware can measure X, Y, or Z (axes xyz); legacy single-axis (x/y/z) supported
 export const TouchPlateMethodSchema = BaseMethodSchema.extend({
   type: z.literal('touchplate'),
-  axes: z.literal('z'),
+  axes: z.enum(['x', 'y', 'z', 'xyz']),
   plateThickness: z.number().default(19.05),
   probeFeedrate: z.number().default(100),
   probeDistance: z.number().default(25),
   requireCheck: z.boolean().default(true),
+  // XY probing: use pin diameter so zero accounts for pin radius
+  useForXYProbing: z.boolean().optional(),
+  probingPinDiameter: z.number().min(0).optional(),
+  probingPinDiameterUnit: z.enum(['mm', 'in']).optional(),
 });
 
 // Manual - user manually zeros (always available)
@@ -165,16 +170,16 @@ export const ZeroingMethodsSettingsSchema = z.object({
 });
 
 // =============================================================================
-// Zeroing Strategies Settings
+// Zeroing Strategies Settings (composite: work XY, work Z, tool-change policy)
 // =============================================================================
-
-// Strategy option: method ID, 'ask', or 'skip'
-const StrategyOptionSchema = z.string().default('ask');
+// workXYZero / workZZero: array of method IDs; ['ask'] means "ask each time".
+// toolChangePolicy: single method ID; 'ask' means "ask each time".
+// No old keys (initialSetup, toolChange, afterPause). No migration.
 
 export const ZeroingStrategiesSettingsSchema = z.object({
-  initialSetup: StrategyOptionSchema,
-  toolChange: StrategyOptionSchema,
-  afterPause: z.string().default('skip'),
+  workXYZero: z.array(z.string()).default(['ask']),
+  workZZero: z.array(z.string()).default(['ask']),
+  toolChangePolicy: z.string().default('ask'),
 });
 
 // =============================================================================

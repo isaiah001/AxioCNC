@@ -64,7 +64,6 @@ import { JogPanel } from './panels/JogPanel'
 import { ProbePanel } from './panels/ProbePanel'
 import { MacrosPanel } from './panels/MacrosPanel'
 import { SpindlePanel } from './panels/SpindlePanel'
-import { ZeroingMethodSelectDialog } from '@/components/ZeroingMethodSelectDialog'
 import { UpdateNotificationDialog } from '@/components/UpdateNotificationDialog'
 import { NotificationSystem } from '@/components/NotificationSystem'
 import { SetupTutorialDialog } from '@/components/SetupTutorialDialog'
@@ -107,6 +106,7 @@ function SortablePanel({
   onToggle,
   panelProps,
   onStartWizard,
+  onOpenJobSetupPanel,
   panelConfig
 }: { 
   id: string
@@ -114,6 +114,7 @@ function SortablePanel({
   onToggle: () => void
   panelProps: PanelProps
   onStartWizard?: (method: ZeroingMethod) => void
+  onOpenJobSetupPanel?: () => void
   panelConfig: ReturnType<typeof createPanelConfig>
 }) {
   const {
@@ -167,7 +168,9 @@ function SortablePanel({
         </div>
         {/* Panel content */}
         {!isCollapsed && (
-          id === 'probe' && onStartWizard ? (
+          id === 'file' && onOpenJobSetupPanel ? (
+            <FilePanel {...panelProps} onSetUpJob={onOpenJobSetupPanel} />
+          ) : id === 'probe' && onStartWizard ? (
             <ProbePanel {...panelProps} onStartWizard={onStartWizard} />
           ) : (
             <PanelContent {...panelProps} />
@@ -324,24 +327,27 @@ export default function Setup() {
 
   const [panelOrder, setPanelOrder] = useState<string[]>(() => {
     const stored = localStorage.getItem('axiocnc-setup-panel-order')
+    const validPanels = ['dro', 'jog', 'spindle', 'rapid', 'probe', 'file', 'macros', 'camera', 'joystick', 'debug']
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        // Validate it's an array with valid panel IDs
-        const validPanels = ['dro', 'jog', 'spindle', 'rapid', 'probe', 'file', 'macros', 'camera', 'joystick', 'debug']
-        if (Array.isArray(parsed) && parsed.every(id => validPanels.includes(id))) {
-          // Store joystick position if it exists in the saved order
-          const joystickIndex = parsed.indexOf('joystick')
-          if (joystickIndex !== -1) {
-            joystickPositionRef.current = joystickIndex
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((id: string) => validPanels.includes(id))
+          if (filtered.length === parsed.length) {
+            // Store joystick position if it exists in the saved order
+            const joystickIndex = filtered.indexOf('joystick')
+            if (joystickIndex !== -1) {
+              joystickPositionRef.current = joystickIndex
+            }
+            return filtered
           }
-          return parsed
         }
       } catch {
         // Invalid JSON, use default
       }
     }
-    return ['dro', 'rapid', 'jog', 'file', 'probe', 'macros', 'spindle', 'camera']
+    // Default order: DRO, jog, joystick, file, rapid, spindle, probe, macros, camera, debug
+    return ['dro', 'jog', 'joystick', 'file', 'rapid', 'spindle', 'probe', 'macros', 'camera', 'debug']
   })
   
   // Add/remove joystick panel to order when joystick is enabled/disabled
@@ -447,68 +453,53 @@ export default function Setup() {
   // Probe status (from pinState - 'P' indicates probe contact)
   const [probeContact, setProbeContact] = useState<boolean>(false)
   
-  // Wizard state
+  // One-off probe from Probe panel (block-based SingleMethodProbeFlow)
   const [wizardMethod, setWizardMethod] = useState<ZeroingMethod | null>(null)
-  const [showMethodSelectDialog, setShowMethodSelectDialog] = useState(false)
-  const [pendingJobStart, setPendingJobStart] = useState(false) // Track if we need to start job after wizard completes
+
+  // Job setup wizard (Phase 5: plan + blocks; entry from panel or Run)
+  const [jobSetupWizardOpen, setJobSetupWizardOpen] = useState(false)
+  const [jobSetupPendingJobStart, setJobSetupPendingJobStart] = useState(false)
 
   // G-code command hook - must be declared before use in callbacks
   const { sendCommand } = useGcodeCommand(connectedPort)
 
-  // Handler for starting wizard from job start (called by JobStatusBar)
-  const handleStartWizard = useCallback((method: ZeroingMethod | 'ask' | null) => {
-    if (method === 'ask') {
-      // Show method selection dialog
-      setShowMethodSelectDialog(true)
-      setPendingJobStart(true) // Mark that we need to start job after wizard
-    } else if (method) {
-      // Open wizard with specific method
-      setWizardMethod(method)
-      setPendingJobStart(true) // Mark that we need to start job after wizard
-      // Wizard tab switch is handled automatically by VisualizerPanel when wizardMethod is set
-    }
+  // Open Job Setup Wizard (from left-column panel or from Run). When pendingJobStart, onSetupComplete will close and start job.
+  const handleOpenJobSetupWizard = useCallback((options: { pendingJobStart: boolean }) => {
+    setJobSetupWizardOpen(true)
+    setJobSetupPendingJobStart(options.pendingJobStart)
   }, [])
 
-  // Handle method selection from dialog
-  const handleMethodSelect = useCallback((method: ZeroingMethod | 'skip') => {
-    if (method === 'skip') {
-      // Skip not applicable for initial setup - just close dialog
-      setShowMethodSelectDialog(false)
-      return
-    }
-    setShowMethodSelectDialog(false)
-    setWizardMethod(method)
-    // Switch to wizard tab is handled by VisualizerPanel when wizardMethod is set
+  const handleJobSetupWizardClose = useCallback(() => {
+    setJobSetupWizardOpen(false)
+    setJobSetupPendingJobStart(false)
   }, [])
 
-  // Handle wizard close - start job if pending
-  const handleWizardClose = useCallback(() => {
-    setWizardMethod(null)
-    // If we were starting a job, start it now that wizard is complete
-    if (pendingJobStart) {
-      setPendingJobStart(false)
-      // Check if we should navigate to Monitor before starting
-      const shouldSwitch = settings?.machine?.autoSwitchToMonitor ?? true // Default to true
-      
+  const handleJobSetupComplete = useCallback(() => {
+    if (jobSetupPendingJobStart) {
+      setJobSetupWizardOpen(false)
+      setJobSetupPendingJobStart(false)
+      const shouldSwitch = settings?.machine?.autoSwitchToMonitor ?? true
       if (shouldSwitch) {
-        // Navigate to Monitor first, then start job after navigation completes
         navigate('/monitor')
-        // Small delay to ensure navigation completes before starting job
         setTimeout(() => {
-          if (connectedPort) {
-            sendCommand('gcode:start')
-          }
+          if (connectedPort) sendCommand('gcode:start')
         }, 100)
       } else {
-        // Start job directly without navigation
         setTimeout(() => {
-          if (connectedPort) {
-            sendCommand('gcode:start')
-          }
+          if (connectedPort) sendCommand('gcode:start')
         }, 100)
       }
     }
-  }, [pendingJobStart, connectedPort, sendCommand, settings, navigate])
+  }, [jobSetupPendingJobStart, settings?.machine?.autoSwitchToMonitor, navigate, connectedPort, sendCommand])
+
+  // Handler for one-off probe from Probe panel (opens SingleMethodProbeFlow in wizard tab)
+  const handleStartWizard = useCallback((method: ZeroingMethod | null) => {
+    if (method) setWizardMethod(method)
+  }, [])
+
+  const handleWizardClose = useCallback(() => {
+    setWizardMethod(null)
+  }, [])
   
   // Refs to track state in event handlers to avoid stale closures
   const machineStatusRef = useRef<MachineReadinessStatus>(machineStatus)
@@ -821,7 +812,7 @@ export default function Setup() {
       socketService.off('marlin:homing', handleHomingComplete)
       socketService.off('joystick:flashStatus', flashStatus)
     }
-  }, [dispatch, flashStatus, showErrorNotification]) // dispatch and flashStatus are stable, showErrorNotification from hook
+  }, [connectedPort, dispatch, flashStatus, showErrorNotification, settings?.connection?.baudRate, settings?.controller?.type, t])
   
   // Restore state from API on mount (only when needed - not on every navigation)
   // Only restore if:
@@ -1033,6 +1024,7 @@ export default function Setup() {
         disabled={!isConnected || machineStatus === 'alarm'}
         hasFile={!!jobState?.name}
         onStartWizard={handleStartWizard}
+        onOpenJobSetupWizard={handleOpenJobSetupWizard}
       />
       
       {/* Dashboard - Two column flex layout */}
@@ -1083,6 +1075,10 @@ export default function Setup() {
                         senderState: jobState, // Pass job state for toolpath animation
                       }}
                       onStartWizard={(method) => setWizardMethod(method)}
+                      onOpenJobSetupPanel={() => {
+                        setJobSetupWizardOpen(true)
+                        setJobSetupPendingJobStart(false)
+                      }}
                     />
                   ))}
               </div>
@@ -1123,6 +1119,9 @@ export default function Setup() {
               lastAlarmMessageRef={lastAlarmMessageRef}
               currentWCS={currentWCS}
               senderState={jobState}
+              jobSetupWizardOpen={jobSetupWizardOpen}
+              onJobSetupClose={handleJobSetupWizardClose}
+              onJobSetupComplete={handleJobSetupComplete}
             />
           </div>
           {/* Tools - 25% height */}
@@ -1147,15 +1146,6 @@ export default function Setup() {
           releaseUrl={releaseUrl || undefined}
         />
       )}
-      {/* Method selection dialog for "ask" strategy */}
-      <ZeroingMethodSelectDialog
-        open={showMethodSelectDialog}
-        onOpenChange={setShowMethodSelectDialog}
-        methods={settings?.zeroingMethods?.methods ?? []}
-        title={t('Select Zeroing Method')}
-        description={t('Choose a zeroing method to use before starting the job:')}
-        onSelect={handleMethodSelect}
-      />
     </div>
   )
 }

@@ -160,11 +160,11 @@ const DEFAULT_ZEROING_METHODS_CONFIG: ZeroingMethodsConfig = {
   ],
 }
 
-// Default zeroing strategies configuration
+// Default zeroing strategies (matches ZeroingStrategiesSettingsSchema)
 const DEFAULT_ZEROING_STRATEGIES_CONFIG: ZeroingStrategiesConfig = {
-  initialSetup: 'manual-default',   // Manual zeroing for initial setup
-  toolChange: 'touchplate-default', // Use touch plate for tool changes
-  afterPause: 'skip',               // Usually not needed after pause
+  workXYZero: ['ask'],
+  workZZero: ['ask'],
+  toolChangePolicy: 'ask',
 }
 
 // Default general settings
@@ -728,6 +728,7 @@ export default function Settings() {
     currentVersionData,
     showInfoNotification,
     showErrorNotification,
+    t,
   ])
 
   const handleImportSettings = useCallback((data: unknown) => {
@@ -759,7 +760,7 @@ export default function Settings() {
     // Store pending import data and show confirmation dialog
     setPendingImportData(importData)
     setImportDialogOpen(true)
-  }, [showErrorNotification])
+  }, [showErrorNotification, t])
 
   const handleConfirmImport = useCallback(async () => {
     if (!pendingImportData || isImporting) return
@@ -1043,6 +1044,7 @@ export default function Settings() {
     setCustomTheme,
     showInfoNotification,
     showErrorNotification,
+    t,
   ])
 
   const handleRestoreDefaults = useCallback(async () => {
@@ -1289,7 +1291,7 @@ export default function Settings() {
         // If port is already open, we might get the event immediately
       })
     })
-  }, [connectionConfig])
+  }, [connectionConfig, t])
 
   // Machine config handler
   const handleMachineConfigChange = useCallback((changes: Partial<MachineConfig>) => {

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Maximize2, Terminal, Target, Move, Camera, Wrench } from 'lucide-react'
+import { Maximize2, Terminal, Target, Move, Camera, Wrench, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { socketService } from '@/services/socket'
 import { useGetSettingsQuery, useGetCamerasQuery, useGetStreamMetadataQuery, useGetGcodeQuery } from '@/services/api'
 import type { ZeroingMethod } from '@axiocnc/shared/src/schemas/settings'
 import { VisualizerScene } from '../components/VisualizerScene'
 import { Console } from '@/components/Console'
-import { ZeroingWizardTab } from '@/components/ZeroingWizardTab'
+import { SingleMethodProbeFlow } from '@/components/SingleMethodProbeFlow'
 import { ToolChangeTab } from '@/components/ToolChangeTab'
+import { JobSetupWizard } from '@/components/JobSetupWizard'
 import { useToolChange } from '@/contexts/ToolChangeContext'
 import { processGCode } from '@/lib/gcodeVisualizer'
 import { calculateOutline, type Point2D } from '@/lib/gcodeOutline'
@@ -199,6 +200,12 @@ interface VisualizerPanelProps {
   lastAlarmMessageRef?: React.MutableRefObject<string | null>
   currentWCS?: string
   senderState?: PanelProps['senderState']
+  /** When true, switch to the Set up job tab. Used when user clicks "Set up job" or Run. */
+  jobSetupWizardOpen?: boolean
+  /** Called when user closes the Set up job flow (Cancel or Done). Tab switches back to 3D. */
+  onJobSetupClose?: () => void
+  /** Called when user completes all setup steps (last block done). */
+  onJobSetupComplete?: () => void
 }
 
 export function VisualizerPanel({ 
@@ -211,14 +218,17 @@ export function VisualizerPanel({
   senderState,
   probeContact = false,
   lastAlarmMessageRef,
-  currentWCS = 'G54'
+  currentWCS = 'G54',
+  jobSetupWizardOpen = false,
+  onJobSetupClose,
+  onJobSetupComplete,
 }: VisualizerPanelProps) {
   const { t } = useTranslation()
   // Get settings for connection options (needed for joining port room)
   const { data: settings } = useGetSettingsQuery()
   const { isToolChangePending } = useToolChange()
   
-  const [tab, setTab] = useState<'3d' | 'console' | 'camera' | 'wizard' | 'toolchange'>('3d')
+  const [tab, setTab] = useState<'3d' | 'console' | 'camera' | 'wizard' | 'toolchange' | 'setup'>('3d')
   const [view, setView] = useState<'top' | 'front' | 'iso' | 'fit' | undefined>('iso')
   const [viewKey, setViewKey] = useState(0)
   
@@ -241,6 +251,13 @@ export function VisualizerPanel({
       setTab(prevTab => prevTab === 'toolchange' ? '3d' : prevTab)
     }
   }, [isToolChangePending])
+
+  // Switch to Set up job tab when opened from panel or Run
+  useEffect(() => {
+    if (jobSetupWizardOpen) {
+      setTab('setup')
+    }
+  }, [jobSetupWizardOpen])
   
   // G-code state for visualizer
   const [loadedGcode, setLoadedGcode] = useState<{ name: string; gcode: string } | null>(null)
@@ -279,7 +296,7 @@ export function VisualizerPanel({
   // Memoize Vector3 to prevent unnecessary geometry recreation
   const modelOffsetVector3 = useMemo(() => {
     return modelOffset ? new Vector3(modelOffset.x, modelOffset.y, modelOffset.z) : undefined
-  }, [modelOffset?.x, modelOffset?.y, modelOffset?.z])
+  }, [modelOffset])
   const placedGcodeRef = useRef<string | null>(null) // Track which G-code we've already auto-placed
   const loadedGcodeRef = useRef<{ name: string; gcode: string } | null>(null) // Ref for accessing current loadedGcode in event handlers
   const machinePositionRef = useRef<{ x: number; y: number; z: number }>(machinePosition) // Ref for accessing current machinePosition in event handlers
@@ -456,7 +473,7 @@ export function VisualizerPanel({
     } else {
       setOutlinePoints(null)
     }
-  }, [loadedGcode?.gcode])
+  }, [loadedGcode?.gcode, machinePosition])
 
   // Automatically place model at WCS origin when G-code is loaded
   useEffect(() => {
@@ -614,6 +631,22 @@ export function VisualizerPanel({
           <Camera className="w-4 h-4 inline mr-1.5" />
           {t('Camera')}
         </button>
+        {jobSetupWizardOpen && (
+          <>
+            <div className="w-px h-4 bg-border" />
+            <button
+              onClick={() => setTab('setup')}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                tab === 'setup'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4 inline mr-1.5" />
+              {t('Set up job')}
+            </button>
+          </>
+        )}
         {isToolChangePending && (
           <>
             <div className="w-px h-4 bg-border" />
@@ -665,10 +698,10 @@ export function VisualizerPanel({
         </div>
       )}
       
-      {/* Wizard Tab */}
+      {/* Wizard Tab – one-off probe from Probe panel (block-based, same as Job Setup) */}
       {wizardMethod && (
         <div className={`flex-1 flex flex-col min-h-0 ${tab === 'wizard' ? 'block' : 'hidden'}`}>
-          <ZeroingWizardTab
+          <SingleMethodProbeFlow
             method={wizardMethod}
             onClose={onWizardClose || (() => {})}
             isConnected={isConnected}
@@ -680,6 +713,21 @@ export function VisualizerPanel({
           />
         </div>
       )}
+
+      {/* Set up job tab - multi-step plan + execution (same flow as old dialog) */}
+      <div className={`flex-1 flex flex-col min-h-0 ${tab === 'setup' ? 'block' : 'hidden'}`}>
+        <JobSetupWizard
+          open={jobSetupWizardOpen}
+          embedded
+          onClose={() => {
+            onJobSetupClose?.()
+            setTab('3d')
+          }}
+          onSetupComplete={onJobSetupComplete}
+          onPlaceModel={handlePlaceModel}
+          probeContact={probeContact}
+        />
+      </div>
       
       {/* Camera Tab */}
       <div className={`flex-1 flex flex-col min-h-0 ${tab === 'camera' ? 'block' : 'hidden'}`}>

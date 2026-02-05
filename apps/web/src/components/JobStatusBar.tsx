@@ -27,7 +27,11 @@ interface JobStatusBarProps {
   onFlashStatus?: () => void
   disabled?: boolean
   hasFile?: boolean
-  onStartWizard?: (method: ZeroingMethod | 'ask' | null) => void
+  onStartWizard?: (method: ZeroingMethod | null) => void
+  /** Open Job Setup Wizard when Run is clicked; when user completes setup, caller starts job. */
+  onOpenJobSetupWizard?: (options: { pendingJobStart: boolean }) => void
+  /** When false, hide the Play button (e.g. on Monitor where job is started from Setup). Default true. */
+  showPlayButton?: boolean
 }
 
 export function JobStatusBar({
@@ -40,7 +44,8 @@ export function JobStatusBar({
   onFlashStatus,
   disabled = false,
   hasFile = false,
-  onStartWizard,
+  onOpenJobSetupWizard,
+  showPlayButton = true,
 }: JobStatusBarProps) {
   const { t } = useTranslation()
   const { sendCommand } = useGcodeCommand(connectedPort)
@@ -142,30 +147,13 @@ export function JobStatusBar({
       return
     }
     
-    // Check zeroing strategy before starting
-    const strategy = settings?.zeroingStrategies?.initialSetup
-    const methods = settings?.zeroingMethods?.methods ?? []
-    
-    if (strategy === 'skip') {
-      // Skip zeroing - start directly (with navigation check)
-      startJobWithNavigation()
-    } else if (strategy === 'ask' && onStartWizard) {
-      // Show method selection dialog
-      onStartWizard('ask')
-    } else if (strategy && strategy !== 'ask' && strategy !== 'skip' && onStartWizard) {
-      // Find method by ID and open wizard
-      const method = methods.find((m: ZeroingMethod) => m.id === strategy)
-      if (method && method.enabled) {
-        onStartWizard(method)
-      } else {
-        // Method not found or disabled - start anyway (fallback, with navigation check)
-        startJobWithNavigation()
-      }
+    // Pre-job setup: always open Job Setup Wizard when Run is clicked (new strategy model)
+    if (onOpenJobSetupWizard) {
+      onOpenJobSetupWizard({ pendingJobStart: true })
     } else {
-      // No wizard handler or strategy not set - start directly (with navigation check)
       startJobWithNavigation()
     }
-  }, [isConnected, connectedPort, needsHomingConfirmation, onFlashStatus, sendCommand, settings, onStartWizard, startJobWithNavigation, jobStatus, dispatch])
+  }, [isConnected, connectedPort, needsHomingConfirmation, onFlashStatus, onOpenJobSetupWizard, startJobWithNavigation, jobStatus, dispatch])
 
   const handleStartConfirmed = useCallback(() => {
     if (!isConnected || !connectedPort) {
@@ -178,30 +166,13 @@ export function JobStatusBar({
       dispatch(clearJobCompletion())
     }
     
-    // Check zeroing strategy before starting (same logic as handleStartClick)
-    const strategy = settings?.zeroingStrategies?.initialSetup
-    const methods = settings?.zeroingMethods?.methods ?? []
-    
-    if (strategy === 'skip') {
-      // Skip zeroing - start directly (with navigation check)
-      startJobWithNavigation()
-    } else if (strategy === 'ask' && onStartWizard) {
-      // Show method selection dialog
-      onStartWizard('ask')
-    } else if (strategy && strategy !== 'ask' && strategy !== 'skip' && onStartWizard) {
-      // Find method by ID and open wizard
-      const method = methods.find((m: ZeroingMethod) => m.id === strategy)
-      if (method && method.enabled) {
-        onStartWizard(method)
-      } else {
-        // Method not found or disabled - start anyway (fallback, with navigation check)
-        startJobWithNavigation()
-      }
+    // Pre-job setup: open Job Setup Wizard (same as handleStartClick)
+    if (onOpenJobSetupWizard) {
+      onOpenJobSetupWizard({ pendingJobStart: true })
     } else {
-      // No wizard handler or strategy not set - start directly (with navigation check)
       startJobWithNavigation()
     }
-  }, [isConnected, connectedPort, sendCommand, settings, onStartWizard, startJobWithNavigation, jobStatus, dispatch])
+  }, [isConnected, connectedPort, onOpenJobSetupWizard, startJobWithNavigation, jobStatus, dispatch])
 
   const handlePause = useCallback(() => {
     if (!isConnected || !connectedPort) {
@@ -362,52 +333,59 @@ export function JobStatusBar({
       <div className="w-px h-6 bg-border mx-2" />
       
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground mr-2">{t('Job:')}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground mr-2" title={t('Job status and controls')}>
+          {t('Job')}
+        </span>
         {getStatusBadge()}
         
         <TooltipProvider>
           <div className="flex items-center gap-1 ml-2">
-            {/* Play button - enabled when not started or paused, file is loaded, and machine is ready */}
-            {playDisabledReason ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-block">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={jobStatus === 'paused' ? handleResume : handleStartClick}
-                      disabled={isPlayDisabled}
-                      className="h-7"
-                    >
-                      <Play className="w-4 h-4 mr-1" /> {t('Play')}
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{playDisabledReason}</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={jobStatus === 'paused' ? handleResume : handleStartClick}
-                disabled={isPlayDisabled}
-                className="h-7"
-              >
-                <Play className="w-4 h-4 mr-1" /> {t('Play')}
-              </Button>
-            )}
-          
-          {/* Pause button - enabled when running */}
+            {/* Play button - optional (shown on Setup, hidden on Monitor) */}
+            {showPlayButton &&
+              (playDisabledReason ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-block">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={jobStatus === 'paused' ? handleResume : handleStartClick}
+                        disabled={isPlayDisabled}
+                        className="h-7"
+                      >
+                        <Play className="w-4 h-4 mr-1" /> {t('Play')}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{playDisabledReason}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={jobStatus === 'paused' ? handleResume : handleStartClick}
+                  disabled={isPlayDisabled}
+                  className="h-7"
+                >
+                  <Play className="w-4 h-4 mr-1" /> {t('Play')}
+                </Button>
+              ))}
+
+          {/* Pause / Resume - label and action switch by state */}
           <Button
             variant="outline"
             size="sm"
-            onClick={handlePause}
-            disabled={disabled || jobStatus !== 'running'}
+            onClick={jobStatus === 'paused' ? handleResume : handlePause}
+            disabled={disabled || (jobStatus !== 'running' && jobStatus !== 'paused')}
             className="h-7"
           >
-            <Pause className="w-4 h-4 mr-1" /> {t('Pause')}
+            {jobStatus === 'paused' ? (
+              <><Play className="w-4 h-4 mr-1" /> {t('Resume')}</>
+            ) : (
+              <><Pause className="w-4 h-4 mr-1" /> {t('Pause')}</>
+            )}
           </Button>
           
             {/* Stop button - enabled when running or paused */}

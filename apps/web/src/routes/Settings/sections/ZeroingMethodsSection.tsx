@@ -54,8 +54,8 @@ import { cn } from '@/lib/utils'
 // Available zeroing method types
 export type ZeroingMethodType = 'bitsetter' | 'bitzero' | 'touchplate' | 'manual' | 'custom'
 
-// Which axes a method can zero
-export type ZeroingAxes = 'z' | 'xy' | 'xyz'
+// Which axes a method can zero (multi-axis: xy/xyz/z for BitZero/Manual; single-axis: x/y/z for Touchplate)
+export type ZeroingAxes = 'x' | 'y' | 'z' | 'xy' | 'xyz'
 
 // Base configuration shared by all methods
 interface BaseMethodConfig {
@@ -77,23 +77,27 @@ export interface BitSetterConfig extends BaseMethodConfig {
   requireCheck: boolean
 }
 
-// BitZero - corner/edge/center probe (XYZ)
+// BitZero - corner/edge/center probe (XYZ, XY only, or Z only)
 export interface BitZeroConfig extends BaseMethodConfig {
   type: 'bitzero'
+  axes: 'xyz' | 'xy' | 'z'
   probeThickness: number // Thickness of the probe body
   probeFeedrate: number
   probeDistance: number
   requireCheck: boolean
 }
 
-// Touch Plate - simple Z touch plate
+// Touch Plate - one hardware can measure X, Y, or Z (axes xyz); legacy single-axis (x/y/z) supported
 export interface TouchPlateConfig extends BaseMethodConfig {
   type: 'touchplate'
-  axes: 'z'
+  axes: 'x' | 'y' | 'z' | 'xyz'
   plateThickness: number
   probeFeedrate: number
   probeDistance: number
   requireCheck: boolean
+  useForXYProbing?: boolean
+  probingPinDiameter?: number
+  probingPinDiameterUnit?: 'mm' | 'in'
 }
 
 // Manual - user manually zeros (always available)
@@ -142,15 +146,15 @@ const createMethodTypes = (t: (key: string) => string): Record<ZeroingMethodType
   'bitzero': {
     icon: <Crosshair className="w-5 h-5" />,
     title: t('BitZero'),
-    description: t('Corner, edge, or center probe for X, Y, and Z zeroing'),
+    description: t('Corner, edge, or center probe for XYZ zeroing'),
     defaultAxes: 'xyz',
     canChangeAxes: false,
   },
   'touchplate': {
     icon: <SquareDashedBottom className="w-5 h-5" />,
     title: t('Touch Plate'),
-    description: t('Simple touch plate for Z-axis zeroing'),
-    defaultAxes: 'z',
+    description: t('Touch plate for X, Y, or Z-axis zeroing'),
+    defaultAxes: 'xyz',
     canChangeAxes: false,
   },
   'manual': {
@@ -212,11 +216,14 @@ function createDefaultMethod(type: ZeroingMethodType, existingMethods: ZeroingMe
       return {
         ...base,
         type: 'touchplate',
-        axes: 'z',
+        axes: 'xyz',
         plateThickness: 3.175, // 1/8" is common
         probeFeedrate: 100,
         probeDistance: 50,
         requireCheck: true,
+        useForXYProbing: false,
+        probingPinDiameter: undefined,
+        probingPinDiameterUnit: 'mm',
       }
     case 'manual':
       return {
@@ -367,7 +374,7 @@ export function ZeroingMethodsSection({
   const methods = config.methods
   const hasManual = methods.some(m => m.type === 'manual')
   
-  // Handle selecting a method type to add (doesn't save yet)
+  // Handle selecting a method type to add (one card per hardware)
   const handleSelectMethodType = (type: ZeroingMethodType) => {
     const newMethod = createDefaultMethod(type, methods, t)
     setAddDialogOpen(false)
@@ -588,7 +595,7 @@ function MethodEditDialog({
             />
           </SettingsField>
 
-          {/* Axes selection (if changeable) */}
+          {/* Axes selection: Manual/Custom only; BitZero and Touch Plate are fixed (XYZ) */}
           {typeInfo.canChangeAxes && editedMethod.type !== 'manual' && (
             <SettingsField label={t('Axes')} description={t('Which axes this method zeros')}>
               <Select
@@ -952,6 +959,56 @@ function TouchPlateSettings({
             <span className="text-xs text-muted-foreground">{t('mm/min')}</span>
           </div>
         </SettingsField>
+      </div>
+
+      {/* Also use for X/Y probing + pin diameter */}
+      <div className="pt-2 border-t space-y-4">
+        <div className="flex items-start gap-3">
+          <Switch
+            checked={config.useForXYProbing ?? false}
+            onCheckedChange={(checked) => onChange({ useForXYProbing: checked })}
+            className="mt-0.5"
+          />
+          <div className="space-y-1">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              {t('Also use for X/Y probing?')}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {t('When enabled, you can set XY zero with this touch plate. Enter the probing pin or tool diameter so the zero accounts for the radius.')}
+            </p>
+          </div>
+        </div>
+        {(config.useForXYProbing ?? false) && (
+          <SettingsField
+            label={t('Probing pin diameter')}
+            description={t('Diameter of the pin or tool used for XY probing')}
+            tooltip={t('Half of this (the radius) is used to offset the zero so the edge of the pin aligns with the datum.')}
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={config.probingPinDiameter ?? ''}
+                onChange={(e) => onChange({ probingPinDiameter: e.target.value === '' ? undefined : parseFloat(e.target.value) || 0 })}
+                className="w-24"
+                placeholder="0"
+              />
+              <Select
+                value={config.probingPinDiameterUnit ?? 'mm'}
+                onValueChange={(v: 'mm' | 'in') => onChange({ probingPinDiameterUnit: v })}
+              >
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mm">{t('mm')}</SelectItem>
+                  <SelectItem value="in">{t('in')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </SettingsField>
+        )}
       </div>
 
       {/* Require Check Before Running */}

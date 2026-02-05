@@ -17,7 +17,9 @@ function getMethodDescription(method: ZeroingMethod, t: (key: string, options?: 
     case 'bitzero':
       return t('Corner/edge/center probe for {{axes}} zeroing', { axes: method.axes.toUpperCase() })
     case 'touchplate':
-      return t('Touch plate for Z-axis zeroing')
+      return method.axes === 'xyz'
+        ? t('Touch plate (X, Y, Z)')
+        : t('Touch plate ({{axis}})', { axis: method.axes.toUpperCase() })
     case 'manual':
       return t('Manually jog to position and set {{axes}} zero', { axes: method.axes.toUpperCase() })
     case 'custom':
@@ -63,6 +65,9 @@ export function ProbePanel({
   
   return (
     <div className="p-3 space-y-2">
+      <p className="text-xs text-muted-foreground">
+        {t('Quick actions: run individual zeroing methods.')}
+      </p>
       {methods.map((method) => (
         <div 
           key={method.id}
