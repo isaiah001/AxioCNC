@@ -11,7 +11,7 @@ MAKEFILE="${GRBL_SIM_DIR}/Makefile"
 EXECUTABLE="${GRBL_SIM_DIR}/grbl_sim.exe"
 
 # Check if cloned
-if [ ! -d "$GRBL_SIM_DIR" ] || [ ! -d "$GRBL_SIM_DIR/.git" ]; then
+if [ ! -d "$GRBL_SIM_DIR" ]; then
     echo "❌ Error: grbl-sim not found at $GRBL_SIM_DIR"
     echo "   Run 'developers/scripts/grblsim/grblsim-clone.sh' first"
     exit 1
