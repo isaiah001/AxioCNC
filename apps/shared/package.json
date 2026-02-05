@@ -1,6 +1,6 @@
 {
   "name": "@axiocnc/shared",
-  "version": "0.0.88",
+  "version": "0.0.89",
   "description": "AxioCNC Shared - Common schemas and utilities",
   "private": true,
   "main": "dist/index.js",
