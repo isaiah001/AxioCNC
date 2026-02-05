@@ -44,6 +44,17 @@
     "homingCorner": "back-right"
   },
   {
+    "id": "shapeoko-pro-xxl",
+    "name": "Shapeoko Pro XXL",
+    "manufacturer": "Carbide 3D",
+    "dimensions": {
+      "width": 865,
+      "depth": 859,
+      "height": 95
+    },
+    "homingCorner": "back-right"
+  },
+  {
     "id": "longmill-12x12",
     "name": "LongMill 12x12",
     "manufacturer": "Sienci Labs",
