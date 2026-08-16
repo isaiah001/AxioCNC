@@ -14,6 +14,8 @@ import { useGetExtensionsQuery } from '@/services/api'
 import { trackFeatureUsed } from '@/services/analytics'
 import type { PanelProps } from '../types'
 
+const ANALOG_JOG_HEARTBEAT_MS = 100
+
 export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashStatus }: PanelProps) {
   const { t } = useTranslation()
   // Load mode from localStorage or use default
@@ -89,6 +91,8 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
   const [isDraggingZ, setIsDraggingZ] = useState(false)
   const xyJoystickRef = useRef<HTMLDivElement>(null)
   const zLeverRef = useRef<HTMLDivElement>(null)
+  const xyPointerIdRef = useRef<number | null>(null)
+  const zPointerIdRef = useRef<number | null>(null)
   
   // Poll analog controls when in analog mode
   // Use jogValues (normalized) for actual jogging
@@ -101,6 +105,8 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
     mode === 'analog', // enabled when in analog mode
     0.05 // 5% deadzone
   )
+  const analogValuesRef = useRef(analogValues)
+  analogValuesRef.current = analogValues
   
   // Send jog control inputs to server when in analog mode
   // Note: Analog jog controls work independently of joystick/gamepad hardware support
@@ -109,9 +115,22 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
       sendJogControlInput(analogValues.x, analogValues.y, analogValues.z)
     }
   }, [mode, analogValues.x, analogValues.y, analogValues.z])
+
+  // Repeat active input so the server can stop the machine if this browser
+  // disappears without delivering a pointer-up/cancel event.
+  useEffect(() => {
+    if (mode !== 'analog' || (!isDraggingXY && !isDraggingZ)) return
+
+    const heartbeat = window.setInterval(() => {
+      const current = analogValuesRef.current
+      sendJogControlInput(current.x, current.y, current.z)
+    }, ANALOG_JOG_HEARTBEAT_MS)
+
+    return () => window.clearInterval(heartbeat)
+  }, [mode, isDraggingXY, isDraggingZ])
   
-  // Calculate joystick values from mouse position
-  const updateJoystickFromMouse = useCallback((clientX: number, clientY: number) => {
+  // Calculate joystick values from pointer position
+  const updateJoystickFromPointer = useCallback((clientX: number, clientY: number) => {
     const element = xyJoystickRef.current
     if (!element) return
     
@@ -137,9 +156,54 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
     // Server-side gamepad uses settings.joystick.invertY instead
     setJogValues({ x: normalized.x, y: -normalized.y })
   }, [])
-  
-  // Handle XY joystick mouse down
-  const handleXYMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+
+  const stopXYJog = useCallback((pointerId?: number) => {
+    if (pointerId !== undefined && xyPointerIdRef.current !== pointerId) return
+    if (xyPointerIdRef.current === null) return
+
+    xyPointerIdRef.current = null
+    setIsDraggingXY(false)
+    setJoystickPos({ x: 0, y: 0 })
+    setJogValues({ x: 0, y: 0 })
+
+    const z = zPointerIdRef.current === null ? 0 : analogValuesRef.current.z
+    sendJogControlInput(0, 0, z)
+  }, [])
+
+  const stopZJog = useCallback((pointerId?: number) => {
+    if (pointerId !== undefined && zPointerIdRef.current !== pointerId) return
+    if (zPointerIdRef.current === null) return
+
+    zPointerIdRef.current = null
+    setIsDraggingZ(false)
+    setZLevel(50)
+
+    const current = analogValuesRef.current
+    const x = xyPointerIdRef.current === null ? 0 : current.x
+    const y = xyPointerIdRef.current === null ? 0 : current.y
+    sendJogControlInput(x, y, 0)
+  }, [])
+
+  const stopAllJogging = useCallback(() => {
+    const wasActive = xyPointerIdRef.current !== null || zPointerIdRef.current !== null
+
+    xyPointerIdRef.current = null
+    zPointerIdRef.current = null
+    setIsDraggingXY(false)
+    setIsDraggingZ(false)
+    setJoystickPos({ x: 0, y: 0 })
+    setJogValues({ x: 0, y: 0 })
+    setZLevel(50)
+
+    if (wasActive) {
+      sendJogControlInput(0, 0, 0)
+    }
+  }, [])
+
+  // Handle XY joystick pointer down (mouse, touch, or pen)
+  const handleXYPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+
     const canJog = canPerformAction(isConnected, connectedPort, machineStatus, false, ActionRequirements.jog)
     if (!canJog) {
       e.preventDefault()
@@ -147,35 +211,30 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
       onFlashStatus()
       return
     }
+
+    if (xyPointerIdRef.current !== null || zPointerIdRef.current !== null) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    xyPointerIdRef.current = e.pointerId
+    e.currentTarget.setPointerCapture(e.pointerId)
     setIsDraggingXY(true)
-    updateJoystickFromMouse(e.clientX, e.clientY)
-  }, [isConnected, connectedPort, machineStatus, onFlashStatus, updateJoystickFromMouse])
-  
-  // Document-level mouse move and up handlers for XY joystick
-  useEffect(() => {
-    if (!isDraggingXY) return
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      updateJoystickFromMouse(e.clientX, e.clientY)
+    updateJoystickFromPointer(e.clientX, e.clientY)
+  }, [isConnected, connectedPort, machineStatus, onFlashStatus, updateJoystickFromPointer])
+
+  const handleXYPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (xyPointerIdRef.current !== e.pointerId) return
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      stopXYJog(e.pointerId)
+      return
     }
-    
-    const handleMouseUp = () => {
-      setIsDraggingXY(false)
-      setJoystickPos({ x: 0, y: 0 })
-      setJogValues({ x: 0, y: 0 })
-    }
-    
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDraggingXY, updateJoystickFromMouse])
-  
-  // Calculate Z level from mouse position
-  const updateZFromMouse = useCallback((clientY: number) => {
+
+    e.preventDefault()
+    updateJoystickFromPointer(e.clientX, e.clientY)
+  }, [stopXYJog, updateJoystickFromPointer])
+
+  // Calculate Z level from pointer position
+  const updateZFromPointer = useCallback((clientY: number) => {
     const element = zLeverRef.current
     if (!element) return
     
@@ -184,9 +243,11 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
     // Clamp to 0-100, inverted (top = 100, bottom = 0)
     setZLevel(Math.max(0, Math.min(100, (1 - y) * 100)))
   }, [])
-  
-  // Handle Z lever mouse down
-  const handleZMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+
+  // Handle Z lever pointer down (mouse, touch, or pen)
+  const handleZPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+
     const canJog = canPerformAction(isConnected, connectedPort, machineStatus, false, ActionRequirements.jog)
     if (!canJog) {
       e.preventDefault()
@@ -194,31 +255,55 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
       onFlashStatus()
       return
     }
+
+    if (xyPointerIdRef.current !== null || zPointerIdRef.current !== null) return
+
+    e.preventDefault()
+    e.stopPropagation()
+    zPointerIdRef.current = e.pointerId
+    e.currentTarget.setPointerCapture(e.pointerId)
     setIsDraggingZ(true)
-    updateZFromMouse(e.clientY)
-  }, [isConnected, connectedPort, machineStatus, onFlashStatus, updateZFromMouse])
-  
-  // Document-level mouse move and up handlers for Z lever
+    updateZFromPointer(e.clientY)
+  }, [isConnected, connectedPort, machineStatus, onFlashStatus, updateZFromPointer])
+
+  const handleZPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (zPointerIdRef.current !== e.pointerId) return
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      stopZJog(e.pointerId)
+      return
+    }
+
+    e.preventDefault()
+    updateZFromPointer(e.clientY)
+  }, [stopZJog, updateZFromPointer])
+
+  // Any interruption of an active browser gesture must explicitly neutralize
+  // the server input. Pointer capture covers leaving the control bounds; these
+  // handlers cover app switching, navigation, and connection loss.
   useEffect(() => {
-    if (!isDraggingZ) return
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      updateZFromMouse(e.clientY)
+    const handleWindowBlur = () => stopAllJogging()
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') stopAllJogging()
     }
-    
-    const handleMouseUp = () => {
-      setIsDraggingZ(false)
-      setZLevel(50) // Return to center
-    }
-    
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    
+
+    window.addEventListener('blur', handleWindowBlur)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('blur', handleWindowBlur)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+      if (xyPointerIdRef.current !== null || zPointerIdRef.current !== null) {
+        xyPointerIdRef.current = null
+        zPointerIdRef.current = null
+        sendJogControlInput(0, 0, 0)
+      }
     }
-  }, [isDraggingZ, updateZFromMouse])
+  }, [stopAllJogging])
+
+  useEffect(() => {
+    if (!isConnected) stopAllJogging()
+  }, [isConnected, stopAllJogging])
 
   return (
     <div className="p-3 flex flex-col gap-3">
@@ -229,6 +314,7 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
           size="sm" 
           className="flex-1 h-7 text-xs"
           onClick={() => {
+            stopAllJogging()
             setMode('steps')
             localStorage.setItem('axiocnc-setup-jog-mode', 'steps')
             trackFeatureUsed('jog', 'JogPanel', 'mode_change', 'steps')
@@ -448,8 +534,12 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
             {/* XY Joystick */}
             <div 
               ref={xyJoystickRef}
-              className="relative w-36 h-36 rounded-full bg-muted border-2 border-border cursor-crosshair select-none"
-              onMouseDown={handleXYMouseDown}
+              className="relative w-36 h-36 rounded-full bg-muted border-2 border-border cursor-crosshair touch-none select-none"
+              onPointerDown={handleXYPointerDown}
+              onPointerMove={handleXYPointerMove}
+              onPointerUp={(e) => stopXYJog(e.pointerId)}
+              onPointerCancel={(e) => stopXYJog(e.pointerId)}
+              onLostPointerCapture={(e) => stopXYJog(e.pointerId)}
             >
               {/* Crosshairs */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -476,8 +566,12 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
               <span className="text-[10px] text-blue-500 font-bold">Z+</span>
               <div 
                 ref={zLeverRef}
-                className="relative h-32 w-10 rounded-full bg-muted border-2 border-border cursor-ns-resize select-none"
-                onMouseDown={handleZMouseDown}
+                className="relative h-32 w-10 rounded-full bg-muted border-2 border-border cursor-ns-resize touch-none select-none"
+                onPointerDown={handleZPointerDown}
+                onPointerMove={handleZPointerMove}
+                onPointerUp={(e) => stopZJog(e.pointerId)}
+                onPointerCancel={(e) => stopZJog(e.pointerId)}
+                onLostPointerCapture={(e) => stopZJog(e.pointerId)}
               >
                 {/* Center line */}
                 <div className="absolute top-1/2 left-2 right-2 h-px bg-border" />
