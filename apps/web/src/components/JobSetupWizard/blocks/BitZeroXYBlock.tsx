@@ -4,6 +4,7 @@ import { AlertCircle, Check, HelpCircle, Loader2, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { buildSetZeroCommand } from '@/utils/gcode'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
+import { appendProbeInput } from '@/utils/probeInput'
 import { SetupBlockLayout } from './SetupBlockLayout'
 import type { SetupBlockProps } from './types'
 import type { BitZeroConfig } from '@/routes/Settings/sections/ZeroingMethodsSection'
@@ -60,17 +61,17 @@ export function BitZeroXYBlock({ methods, context, onComplete, onError, debugAll
       'G21',
       '',
       '; X-Axis Probing',
-      `G38.2 X${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 X${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 X-2',
-      `G38.2 X5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 X5 F${probeFeedrateB}`, method.probeInput),
       'G90',
       '%X_RIGHT=posx',
       'G91',
       `G0 X-${probeMajorRetract}`,
       '',
-      `G38.2 X-${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 X-${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 X2',
-      `G38.2 X-5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 X-5 F${probeFeedrateB}`, method.probeInput),
       'G90',
       '%X_LEFT=posx',
       '',
@@ -83,17 +84,17 @@ export function BitZeroXYBlock({ methods, context, onComplete, onError, debugAll
       '',
       '; Y-Axis Probing',
       'G91',
-      `G38.2 Y${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 Y${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 Y-2',
-      `G38.2 Y5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 Y5 F${probeFeedrateB}`, method.probeInput),
       'G90',
       '%Y_TOP=posy',
       'G91',
       `G0 Y-${probeMajorRetract}`,
       '',
-      `G38.2 Y-${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 Y-${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 Y2',
-      `G38.2 Y-5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 Y-5 F${probeFeedrateB}`, method.probeInput),
       'G90',
       '%Y_BTM=posy',
       '',

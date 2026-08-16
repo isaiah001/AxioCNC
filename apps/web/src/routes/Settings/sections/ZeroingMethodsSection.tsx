@@ -50,6 +50,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { ProbeInput } from '@axiocnc/shared/src/schemas/settings'
 
 // Available zeroing method types
 export type ZeroingMethodType = 'bitsetter' | 'bitzero' | 'touchplate' | 'manual' | 'custom'
@@ -70,6 +71,7 @@ interface BaseMethodConfig {
 export interface BitSetterConfig extends BaseMethodConfig {
   type: 'bitsetter'
   axes: 'z'
+  probeInput?: ProbeInput
   position: { x: number; y: number; z: number }
   probeFeedrate: number
   probeDistance: number
@@ -81,6 +83,7 @@ export interface BitSetterConfig extends BaseMethodConfig {
 export interface BitZeroConfig extends BaseMethodConfig {
   type: 'bitzero'
   axes: 'xyz' | 'xy' | 'z'
+  probeInput?: ProbeInput
   probeThickness: number // Thickness of the probe body
   probeFeedrate: number
   probeDistance: number
@@ -91,6 +94,7 @@ export interface BitZeroConfig extends BaseMethodConfig {
 export interface TouchPlateConfig extends BaseMethodConfig {
   type: 'touchplate'
   axes: 'x' | 'y' | 'z' | 'xyz'
+  probeInput?: ProbeInput
   plateThickness: number
   probeFeedrate: number
   probeDistance: number
@@ -121,6 +125,12 @@ export type ZeroingMethod =
 
 export interface ZeroingMethodsConfig {
   methods: ZeroingMethod[]
+}
+
+type ProbeMethodConfig = BitSetterConfig | BitZeroConfig | TouchPlateConfig
+
+function isProbeMethod(method: ZeroingMethod): method is ProbeMethodConfig {
+  return method.type === 'bitsetter' || method.type === 'bitzero' || method.type === 'touchplate'
 }
 
 interface ZeroingMethodsSectionProps {
@@ -258,6 +268,16 @@ function AxesBadge({ axes }: { axes: ZeroingAxes }) {
   )
 }
 
+function ProbeInputBadge({ probeInput }: { probeInput?: ProbeInput }) {
+  if (probeInput === undefined) return null
+
+  return (
+    <span className="h-4 px-1 rounded text-[10px] font-bold flex items-center justify-center bg-violet-500/20 text-violet-600 dark:text-violet-400">
+      P{probeInput}
+    </span>
+  )
+}
+
 // Method card component
 function MethodCard({ 
   method, 
@@ -295,6 +315,7 @@ function MethodCard({
               <CardTitle className="text-base flex items-center gap-2">
                 {method.name}
                 <AxesBadge axes={method.axes} />
+                {isProbeMethod(method) && <ProbeInputBadge probeInput={method.probeInput} />}
               </CardTitle>
               <CardDescription className="text-xs">
                 {typeInfo.title}
@@ -614,6 +635,14 @@ function MethodEditDialog({
             </SettingsField>
           )}
 
+          {/* Only methods that generate G38.x commands can select a probe input. */}
+          {isProbeMethod(editedMethod) && (
+            <ProbeInputSettings
+              value={editedMethod.probeInput}
+              onChange={(probeInput) => setEditedMethod({ ...editedMethod, probeInput })}
+            />
+          )}
+
           {/* Type-specific settings */}
           {editedMethod.type === 'bitsetter' && (
             <BitSetterSettings 
@@ -661,6 +690,41 @@ function MethodEditDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ProbeInputSettings({
+  value,
+  onChange,
+}: {
+  value?: ProbeInput
+  onChange: (value: ProbeInput | undefined) => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <SettingsField
+      label={t('Probe Input')}
+      description={t('Select the probe input used by this zeroing method')}
+      tooltip={t('Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support.')}
+    >
+      <Select
+        value={value === undefined ? 'default' : String(value)}
+        onValueChange={(selected) => {
+          onChange(selected === 'default' ? undefined : Number(selected) as ProbeInput)
+        }}
+      >
+        <SelectTrigger className="w-52">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="default">{t('Controller default')}</SelectItem>
+          <SelectItem value="0">P0 — {t('Primary probe')}</SelectItem>
+          <SelectItem value="1">P1 — {t('Toolsetter')}</SelectItem>
+          <SelectItem value="2">P2 — {t('Secondary probe')}</SelectItem>
+        </SelectContent>
+      </Select>
+    </SettingsField>
   )
 }
 

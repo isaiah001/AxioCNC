@@ -2,8 +2,33 @@ import { test } from 'tap';
 import {
   getDefaultSettings,
   validatePartialSettings,
-  parseSettings
+  parseSettings,
+  ZeroingMethodSchema,
 } from '@axiocnc/shared/src/schemas/settings';
+
+const probeMethodFixtures = [
+  {
+    id: 'bitsetter',
+    type: 'bitsetter',
+    name: 'BitSetter',
+    enabled: true,
+    axes: 'z',
+  },
+  {
+    id: 'bitzero',
+    type: 'bitzero',
+    name: 'BitZero',
+    enabled: true,
+    axes: 'xyz',
+  },
+  {
+    id: 'touchplate',
+    type: 'touchplate',
+    name: 'Touch Plate',
+    enabled: true,
+    axes: 'xyz',
+  },
+];
 
 test('Settings Schema Functions', (t) => {
   t.test('getDefaultSettings - returns complete settings with all defaults applied', (subt) => {
@@ -143,6 +168,44 @@ test('Settings Schema Functions', (t) => {
     // Should not throw when parsed again
     const reParsed = parseSettings(defaults);
     subt.same(reParsed, defaults, 'getDefaultSettings should produce valid settings');
+
+    subt.end();
+  });
+
+  t.test('probe methods accept P0, P1, and P2 probe inputs', (subt) => {
+    probeMethodFixtures.forEach((method) => {
+      [0, 1, 2].forEach((probeInput) => {
+        const result = ZeroingMethodSchema.safeParse({ ...method, probeInput });
+
+        subt.ok(result.success, `${method.type} should accept P${probeInput}`);
+        subt.equal(result.data?.probeInput, probeInput, `${method.type} should preserve P${probeInput}`);
+      });
+    });
+
+    subt.end();
+  });
+
+  t.test('legacy probe methods remain valid without a probe input', (subt) => {
+    probeMethodFixtures.forEach((method) => {
+      const result = ZeroingMethodSchema.safeParse(method);
+
+      subt.ok(result.success, `${method.type} should accept an omitted probeInput`);
+      subt.notOk(Object.prototype.hasOwnProperty.call(result.data, 'probeInput'), `${method.type} should keep probeInput omitted`);
+    });
+
+    subt.end();
+  });
+
+  t.test('probe methods reject invalid probe inputs', (subt) => {
+    const invalidProbeInputs = [-1, 3, 1.5, '1'];
+
+    probeMethodFixtures.forEach((method) => {
+      invalidProbeInputs.forEach((probeInput) => {
+        const result = ZeroingMethodSchema.safeParse({ ...method, probeInput });
+
+        subt.notOk(result.success, `${method.type} should reject probeInput ${JSON.stringify(probeInput)}`);
+      });
+    });
 
     subt.end();
   });

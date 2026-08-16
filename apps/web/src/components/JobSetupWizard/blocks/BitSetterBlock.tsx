@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, HelpCircle, Check, Navigation, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
+import { appendProbeInput } from '@/utils/probeInput'
 import { selectWorkPosition } from '@/store/hooks'
 import type { RootState } from '@/store'
 import { SetupBlockLayout } from './SetupBlockLayout'
@@ -100,15 +101,15 @@ export function BitSetterBlock({ methods, context, onComplete, onError, debugAll
       'M5',
       '',
       'G91',
-      `G38.2 Z-${probeDistance} F${probeRapidFeedrate}`,
+      appendProbeInput(`G38.2 Z-${probeDistance} F${probeRapidFeedrate}`, method.probeInput),
       'G0 z2',
-      'G38.2 z-5 F40',
+      appendProbeInput('G38.2 z-5 F40', method.probeInput),
       'G4 P.25',
-      'G38.4 z10 F20',
+      appendProbeInput('G38.4 z10 F20', method.probeInput),
       'G4 P.25',
-      'G38.2 z-2 F10',
+      appendProbeInput('G38.2 z-2 F10', method.probeInput),
       'G4 P.25',
-      'G38.4 z10 F5',
+      appendProbeInput('G38.4 z10 F5', method.probeInput),
       'G4 P.25',
       '',
       '[UNITS] [DISTANCE] [FEEDRATE] [SPINDLE] [MOTION]',

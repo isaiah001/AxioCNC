@@ -12,6 +12,7 @@ import {
   ConnectionSettingsSchema,
   CameraSettingsSchema,
   PositionSchema,
+  ProbeInputSchema,
   ZeroingMethodSchema,
   ZeroingMethodsSettingsSchema,
   ZeroingStrategiesSettingsSchema,
@@ -34,6 +35,7 @@ export type MachineLimits = z.infer<typeof MachineLimitsSchema>;
 export type ConnectionSettings = z.infer<typeof ConnectionSettingsSchema>;
 export type CameraSettings = z.infer<typeof CameraSettingsSchema>;
 export type Position = z.infer<typeof PositionSchema>;
+export type ProbeInput = z.infer<typeof ProbeInputSchema>;
 
 // Zeroing method types
 export type ZeroingMethod = z.infer<typeof ZeroingMethodSchema>;
@@ -59,6 +61,7 @@ export {
   ConnectionSettingsSchema,
   CameraSettingsSchema,
   PositionSchema,
+  ProbeInputSchema,
   ZeroingMethodSchema,
   ZeroingMethodsSettingsSchema,
   ZeroingStrategiesSettingsSchema,

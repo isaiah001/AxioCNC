@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { buildSetZeroWithOffsetCommand } from '@/utils/gcode'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
+import { appendProbeInput } from '@/utils/probeInput'
 import { SetupBlockLayout } from '@/components/JobSetupWizard/blocks/SetupBlockLayout'
 import { useGetToolsQuery, useGetSettingsQuery } from '@/services/api'
 import { useJobState } from '@/store/hooks'
@@ -158,9 +159,9 @@ export function TouchplateZToolChangeBlock({
       'G21',
       '',
       '; Z-Axis Probing',
-      `G38.2 Z-${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 Z-${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 Z2',
-      `G38.2 Z-5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 Z-5 F${probeFeedrateB}`, method.probeInput),
       setZZeroCommand,
       `G0 Z${zFinal}`,
       '',
