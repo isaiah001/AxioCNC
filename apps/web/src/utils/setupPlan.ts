@@ -77,7 +77,7 @@ export function deriveSetupPlan(
   const workXYIds = strategies.workXYZero
   const workZIds = strategies.workZZero
 
-  // When both XY and Z are single BitZero methods, use one combined work_xyz slot
+  // When one XYZ-capable hardware method handles both XY and Z, use one combined slot.
   if (
     !askXY &&
     !askZ &&
@@ -88,7 +88,10 @@ export function deriveSetupPlan(
     const zMethod = methods.find((m) => m.enabled && m.id === workZIds[0])
     const xyIsBitZero = xyMethod?.type === 'bitzero' && (xyMethod.axes === 'xy' || xyMethod.axes === 'xyz')
     const zIsBitZero = zMethod?.type === 'bitzero' && (zMethod.axes === 'z' || zMethod.axes === 'xyz')
-    if (xyIsBitZero && zIsBitZero) {
+    const sameEdgeProbe = xyMethod?.type === 'edgeprobe'
+      && zMethod?.type === 'edgeprobe'
+      && xyMethod.id === zMethod.id
+    if ((xyIsBitZero && zIsBitZero) || sameEdgeProbe) {
       slots.push({ kind: 'work_xyz', ask: false, methodIds: [workXYIds[0], workZIds[0]] })
     } else {
       slots.push({ kind: 'work_xy', ask: askXY, methodIds: [...workXYIds] })
@@ -154,6 +157,9 @@ export type SetupBlockKind =
   | 'touchplate_y'
   | 'touchplate_xy'
   | 'touchplate_z'
+  | 'edgeprobe_xy'
+  | 'edgeprobe_z'
+  | 'edgeprobe_xyz'
   | 'manual_xy'
   | 'manual_z'
   | 'bitsetter'
@@ -180,6 +186,13 @@ export function slotToBlocks(
   const kind = slot.kind
 
   if (kind === 'work_xyz') {
+    const edgeProbe = resolved.find((m) => m.type === 'edgeprobe')
+    if (edgeProbe) {
+      blocks.push({ kind: 'edgeprobe_xy', methods: [edgeProbe] })
+      blocks.push({ kind: 'edgeprobe_z', methods: [edgeProbe] })
+      return blocks
+    }
+
     // Combined BitZero XYZ: two methods (XY + Z) or one method (axes xyz)
     if (resolved.length >= 1) {
       const xyMethod = resolved.find((m) => m.type === 'bitzero' && (m.axes === 'xy' || m.axes === 'xyz')) ?? resolved[0]
@@ -190,6 +203,8 @@ export function slotToBlocks(
     for (const m of resolved) {
       if (m.type === 'bitzero' && (m.axes === 'xy' || m.axes === 'xyz')) {
         blocks.push({ kind: 'bitzero_xy', methods: [m] })
+      } else if (m.type === 'edgeprobe') {
+        blocks.push({ kind: 'edgeprobe_xy', methods: [m] })
       } else if (m.type === 'touchplate' && (m.axes === 'x' || m.axes === 'y')) {
         blocks.push({
           kind: m.axes === 'x' ? 'touchplate_x' : 'touchplate_y',
@@ -205,6 +220,8 @@ export function slotToBlocks(
     for (const m of resolved) {
       if (m.type === 'bitzero' && (m.axes === 'z' || m.axes === 'xyz')) {
         blocks.push({ kind: 'bitzero_z', methods: [m] })
+      } else if (m.type === 'edgeprobe') {
+        blocks.push({ kind: 'edgeprobe_z', methods: [m] })
       } else if (m.type === 'touchplate' && (m.axes === 'z' || m.axes === 'xyz')) {
         blocks.push({ kind: 'touchplate_z', methods: [m] })
       } else if (m.type === 'manual') {
@@ -232,6 +249,9 @@ export function singleMethodToBlocks(method: ZeroingMethod): SetupBlock[] {
 
   if (m.type === 'bitsetter') {
     return [{ kind: 'bitsetter', methods: [m] }]
+  }
+  if (m.type === 'edgeprobe') {
+    return [{ kind: 'edgeprobe_xyz', methods: [m] }]
   }
   if (m.type === 'bitzero') {
     if (m.axes === 'xyz') return [{ kind: 'bitzero_xyz', methods: [m] }]

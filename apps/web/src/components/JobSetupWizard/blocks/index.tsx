@@ -15,13 +15,14 @@ import { TouchplateBlock } from './TouchplateBlock'
 import { BitZeroXYBlock } from './BitZeroXYBlock'
 import { BitZeroZBlock } from './BitZeroZBlock'
 import { BitZeroXYZBlock } from './BitZeroXYZBlock'
+import { EdgeProbeBlock } from './EdgeProbeBlock'
 import { BitSetterBlock } from './BitSetterBlock'
 import { CustomZBlock } from './CustomZBlock'
 
 export type { SetupBlockProps, BlockRunContext } from './types'
 export { SetupBlockLayout, SetupBlockBackButton } from './SetupBlockLayout'
 export type { SetupBlockLayoutProps, SetupBlockNextButtonConfig } from './SetupBlockLayout'
-export { ManualXYBlock, ManualZBlock, TouchplateBlock, BitZeroXYBlock, BitZeroZBlock, BitZeroXYZBlock, BitSetterBlock, CustomZBlock }
+export { ManualXYBlock, ManualZBlock, TouchplateBlock, BitZeroXYBlock, BitZeroZBlock, BitZeroXYZBlock, EdgeProbeBlock, BitSetterBlock, CustomZBlock }
 
 type RenderBlockProps = Omit<SetupBlockProps, 'methods'>
 
@@ -46,6 +47,10 @@ export function RenderSetupBlock(
       return <BitZeroZBlock {...blockProps} />
     case 'bitzero_xyz':
       return <BitZeroXYZBlock {...blockProps} />
+    case 'edgeprobe_xy':
+    case 'edgeprobe_z':
+    case 'edgeprobe_xyz':
+      return <EdgeProbeBlock {...blockProps} />
     case 'bitsetter':
       return <BitSetterBlock {...blockProps} />
     case 'custom_z':

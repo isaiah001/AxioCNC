@@ -115,6 +115,7 @@ export function SingleMethodProbeFlow({
     currentBlock.kind === 'bitzero_xy' ||
     currentBlock.kind === 'bitzero_z' ||
     currentBlock.kind === 'bitzero_xyz' ||
+    currentBlock.kind.startsWith('edgeprobe_') ||
     currentBlock.kind === 'bitsetter' ||
     currentBlock.kind === 'manual_xy' ||
     currentBlock.kind === 'manual_z' ||

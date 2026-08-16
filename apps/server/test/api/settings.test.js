@@ -167,6 +167,7 @@ test('api.settings', (t) => {
       { id: 'bitzero-p0', type: 'bitzero', name: 'Primary', enabled: true, axes: 'xyz', probeInput: 0 },
       { id: 'bitsetter-p1', type: 'bitsetter', name: 'Toolsetter', enabled: true, axes: 'z', probeInput: 1 },
       { id: 'touchplate-p2', type: 'touchplate', name: 'Secondary', enabled: true, axes: 'z', probeInput: 2 },
+      { id: 'edgeprobe-p2', type: 'edgeprobe', name: '3D Probe', enabled: true, axes: 'xyz', probeInput: 2 },
     ];
     const req = createMockRequest({ body: { zeroingMethods: { methods } } });
     const res = createMockResponse();
@@ -175,7 +176,7 @@ test('api.settings', (t) => {
 
     subt.equal(res.statusCode, 200);
     const savedMethods = mockConfigStore.get('settings').zeroingMethods.methods;
-    subt.same(savedMethods.map(method => method.probeInput), [0, 1, 2]);
+    subt.same(savedMethods.map(method => method.probeInput), [0, 1, 2, 2]);
     subt.end();
   });
 

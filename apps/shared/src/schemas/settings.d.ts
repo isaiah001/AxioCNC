@@ -19,6 +19,7 @@ import {
   BitSetterMethodSchema,
   BitZeroMethodSchema,
   TouchPlateMethodSchema,
+  EdgeProbeMethodSchema,
   ManualMethodSchema,
   CustomMethodSchema,
   JoystickSettingsSchema,
@@ -44,6 +45,7 @@ export type ZeroingStrategiesSettings = z.infer<typeof ZeroingStrategiesSettings
 export type BitSetterMethod = z.infer<typeof BitSetterMethodSchema>;
 export type BitZeroMethod = z.infer<typeof BitZeroMethodSchema>;
 export type TouchPlateMethod = z.infer<typeof TouchPlateMethodSchema>;
+export type EdgeProbeMethod = z.infer<typeof EdgeProbeMethodSchema>;
 export type ManualMethod = z.infer<typeof ManualMethodSchema>;
 export type CustomMethod = z.infer<typeof CustomMethodSchema>;
 
@@ -68,6 +70,7 @@ export {
   BitSetterMethodSchema,
   BitZeroMethodSchema,
   TouchPlateMethodSchema,
+  EdgeProbeMethodSchema,
   ManualMethodSchema,
   CustomMethodSchema,
   JoystickSettingsSchema,

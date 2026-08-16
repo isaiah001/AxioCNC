@@ -20,6 +20,8 @@ function getMethodDescription(method: ZeroingMethod, t: (key: string, options?: 
       return method.axes === 'xyz'
         ? t('Touch plate (X, Y, Z)')
         : t('Touch plate ({{axis}})', { axis: method.axes.toUpperCase() })
+    case 'edgeprobe':
+      return t('3D spindle probe for faces, corners, pockets, and slots')
     case 'manual':
       return t('Manually jog to position and set {{axes}} zero', { axes: method.axes.toUpperCase() })
     case 'custom':

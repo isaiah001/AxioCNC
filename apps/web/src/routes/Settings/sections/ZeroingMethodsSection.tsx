@@ -53,7 +53,7 @@ import { cn } from '@/lib/utils'
 import type { ProbeInput } from '@axiocnc/shared/src/schemas/settings'
 
 // Available zeroing method types
-export type ZeroingMethodType = 'bitsetter' | 'bitzero' | 'touchplate' | 'manual' | 'custom'
+export type ZeroingMethodType = 'bitsetter' | 'bitzero' | 'touchplate' | 'edgeprobe' | 'manual' | 'custom'
 
 // Which axes a method can zero (multi-axis: xy/xyz/z for BitZero/Manual; single-axis: x/y/z for Touchplate)
 export type ZeroingAxes = 'x' | 'y' | 'z' | 'xy' | 'xyz'
@@ -104,6 +104,21 @@ export interface TouchPlateConfig extends BaseMethodConfig {
   probingPinDiameterUnit?: 'mm' | 'in'
 }
 
+// Calibrated 3D spindle probe for faces, corners, pockets, and slots
+export interface EdgeProbeConfig extends BaseMethodConfig {
+  type: 'edgeprobe'
+  axes: 'xyz'
+  probeInput?: ProbeInput
+  tipDiameter: number
+  probeFeedrate: number
+  fineProbeFeedrate: number
+  probeDistance: number
+  retractDistance: number
+  cornerSweepDistance: number
+  zOffset: number
+  requireCheck: boolean
+}
+
 // Manual - user manually zeros (always available)
 export interface ManualConfig extends BaseMethodConfig {
   type: 'manual'
@@ -120,6 +135,7 @@ export type ZeroingMethod =
   | BitSetterConfig 
   | BitZeroConfig 
   | TouchPlateConfig 
+  | EdgeProbeConfig
   | ManualConfig 
   | CustomMethodConfig
 
@@ -127,10 +143,10 @@ export interface ZeroingMethodsConfig {
   methods: ZeroingMethod[]
 }
 
-type ProbeMethodConfig = BitSetterConfig | BitZeroConfig | TouchPlateConfig
+type ProbeMethodConfig = BitSetterConfig | BitZeroConfig | TouchPlateConfig | EdgeProbeConfig
 
 function isProbeMethod(method: ZeroingMethod): method is ProbeMethodConfig {
-  return method.type === 'bitsetter' || method.type === 'bitzero' || method.type === 'touchplate'
+  return method.type === 'bitsetter' || method.type === 'bitzero' || method.type === 'touchplate' || method.type === 'edgeprobe'
 }
 
 interface ZeroingMethodsSectionProps {
@@ -164,6 +180,13 @@ const createMethodTypes = (t: (key: string) => string): Record<ZeroingMethodType
     icon: <SquareDashedBottom className="w-5 h-5" />,
     title: t('Touch Plate'),
     description: t('Touch plate for X, Y, or Z-axis zeroing'),
+    defaultAxes: 'xyz',
+    canChangeAxes: false,
+  },
+  'edgeprobe': {
+    icon: <Crosshair className="w-5 h-5" />,
+    title: t('Edge Probe'),
+    description: t('Calibrated 3D spindle probe for faces, corners, pockets, and slots'),
     defaultAxes: 'xyz',
     canChangeAxes: false,
   },
@@ -234,6 +257,20 @@ function createDefaultMethod(type: ZeroingMethodType, existingMethods: ZeroingMe
         useForXYProbing: false,
         probingPinDiameter: undefined,
         probingPinDiameterUnit: 'mm',
+      }
+    case 'edgeprobe':
+      return {
+        ...base,
+        type: 'edgeprobe',
+        axes: 'xyz',
+        tipDiameter: 4,
+        probeFeedrate: 100,
+        fineProbeFeedrate: 25,
+        probeDistance: 25,
+        retractDistance: 2,
+        cornerSweepDistance: 20,
+        zOffset: 0,
+        requireCheck: true,
       }
     case 'manual':
       return {
@@ -359,6 +396,8 @@ function getMethodSummary(method: ZeroingMethod, t: (key: string, options?: Reco
       return t('Probe thickness: {{thickness}}mm', { thickness: method.probeThickness })
     case 'touchplate':
       return t('Plate thickness: {{thickness}}mm', { thickness: method.plateThickness })
+    case 'edgeprobe':
+      return t('Tip diameter: {{diameter}}mm', { diameter: method.tipDiameter })
     case 'manual':
       return t('Jog to position and set zero manually')
     case 'custom':
@@ -663,6 +702,12 @@ function MethodEditDialog({
               onChange={(changes) => setEditedMethod({ ...editedMethod, ...changes })} 
             />
           )}
+          {editedMethod.type === 'edgeprobe' && (
+            <EdgeProbeSettings
+              config={editedMethod}
+              onChange={(changes) => setEditedMethod({ ...editedMethod, ...changes })}
+            />
+          )}
           {editedMethod.type === 'custom' && (
             <CustomMethodSettings 
               config={editedMethod} 
@@ -963,6 +1008,145 @@ function BitZeroSettings({
             </Label>
             <p className="text-xs text-muted-foreground">
               {t('Before probing, you\'ll be asked to touch the probe to verify the circuit is working. This prevents crashes if the probe wire is disconnected or the sensor has failed.')}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Edge Probe specific settings
+function EdgeProbeSettings({
+  config,
+  onChange,
+}: {
+  config: EdgeProbeConfig
+  onChange: (changes: Partial<EdgeProbeConfig>) => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="space-y-4">
+      <SettingsField
+        label={t('Effective Tip Diameter')}
+        description={t('Calibrated diameter of the probe stylus tip')}
+        tooltip={t('Use the effective diameter measured with a ring gauge. Its radius is applied to X and Y edge results.')}
+      >
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            step="0.001"
+            min="0.001"
+            value={config.tipDiameter}
+            onChange={(e) => onChange({ tipDiameter: parseFloat(e.target.value) || 0 })}
+            className="w-24"
+          />
+          <span className="text-xs text-muted-foreground">{t('mm')}</span>
+        </div>
+      </SettingsField>
+
+      <div className="grid grid-cols-2 gap-4">
+        <SettingsField label={t('Probe Distance')} tooltip={t('Maximum distance to search for a surface')}>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min="0.001"
+              value={config.probeDistance}
+              onChange={(e) => onChange({ probeDistance: parseFloat(e.target.value) || 0 })}
+              className="w-20"
+            />
+            <span className="text-xs text-muted-foreground">{t('mm')}</span>
+          </div>
+        </SettingsField>
+
+        <SettingsField label={t('Corner Sweep Distance')} tooltip={t('Distance used to move around an outside corner. The initial X and Y gap must each be smaller than this value.')}>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min="0.001"
+              value={config.cornerSweepDistance}
+              onChange={(e) => onChange({ cornerSweepDistance: parseFloat(e.target.value) || 0 })}
+              className="w-20"
+            />
+            <span className="text-xs text-muted-foreground">{t('mm')}</span>
+          </div>
+        </SettingsField>
+
+        <SettingsField label={t('Probe Feedrate')} tooltip={t('Speed for the first probing pass')}>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min="0.001"
+              value={config.probeFeedrate}
+              onChange={(e) => onChange({ probeFeedrate: parseFloat(e.target.value) || 0 })}
+              className="w-20"
+            />
+            <span className="text-xs text-muted-foreground">{t('mm/min')}</span>
+          </div>
+        </SettingsField>
+
+        <SettingsField label={t('Fine Probe Feedrate')} tooltip={t('Speed for the second, accurate probing pass')}>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min="0.001"
+              value={config.fineProbeFeedrate}
+              onChange={(e) => onChange({ fineProbeFeedrate: parseFloat(e.target.value) || 0 })}
+              className="w-20"
+            />
+            <span className="text-xs text-muted-foreground">{t('mm/min')}</span>
+          </div>
+        </SettingsField>
+
+        <SettingsField label={t('Retract Distance')} tooltip={t('Distance to back away between and after probe passes')}>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min="0.001"
+              value={config.retractDistance}
+              onChange={(e) => onChange({ retractDistance: parseFloat(e.target.value) || 0 })}
+              className="w-20"
+            />
+            <span className="text-xs text-muted-foreground">{t('mm')}</span>
+          </div>
+        </SettingsField>
+
+        <SettingsField label={t('Z Trigger Offset')} tooltip={t('Coordinate assigned at Z contact. Keep zero when the active probe length is calibrated to the stylus tip.')}>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step="0.001"
+              value={config.zOffset}
+              onChange={(e) => onChange({ zOffset: parseFloat(e.target.value) || 0 })}
+              className="w-20"
+            />
+            <span className="text-xs text-muted-foreground">{t('mm')}</span>
+          </div>
+        </SettingsField>
+      </div>
+
+      <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <p className="text-sm text-amber-900 dark:text-amber-100">
+          {t('Calibrate probe runout, effective tip diameter, and probe length before using automatic edge routines. Disable the spindle before installing the probe.')}
+        </p>
+      </div>
+
+      <div className="pt-2 border-t">
+        <div className="flex items-start gap-3">
+          <Switch
+            checked={config.requireCheck}
+            onCheckedChange={(checked) => onChange({ requireCheck: checked })}
+            className="mt-0.5"
+          />
+          <div className="space-y-1">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+              {t('Require Check Before Running')}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {t('Before probing, you will be asked to press and release the stylus to verify the selected probe input.')}
             </p>
           </div>
         </div>
