@@ -40,6 +40,11 @@ export interface MachineStatus {
     activeState: string
     mpos: { x: string; y: string; z: string } | null
     wpos: { x: string; y: string; z: string } | null
+    probeInputs?: Partial<Record<0 | 1 | 2, {
+      available: boolean
+      triggered: boolean
+      sequence: number
+    }>> | null
     pinState?: string | null // Grbl v1.1: input pin state ('XYZPDHRS' indicates triggered pins)
     accessoryState?: string | null // Grbl v1.1: accessory state ('SCFM' indicates spindle/coolant state)
   } | null

@@ -646,8 +646,7 @@ export default function Setup() {
     const handleMachineStatus = (...args: unknown[]) => {
       // Backend sends: machine:status(port, status)
       // Status now includes full controller state including parserstate
-      // port may be needed in future - keep args for now
-      // const port = args[0] as string
+      const port = args[0] as string
       const status = args[1] as {
         parserstate?: {
           modal?: {
@@ -661,7 +660,10 @@ export default function Setup() {
         machineStatus?: string
       }
       
-      if (!status || !isConnectedRef.current) return
+      if (!status
+        || !isConnectedRef.current
+        || !settings?.connection?.port
+        || port !== settings.connection.port) return
       
       // Machine state (positions, spindle) is handled by machineStateSync
       // Only update page-specific state here
@@ -812,7 +814,7 @@ export default function Setup() {
       socketService.off('marlin:homing', handleHomingComplete)
       socketService.off('joystick:flashStatus', flashStatus)
     }
-  }, [connectedPort, dispatch, flashStatus, showErrorNotification, settings?.connection?.baudRate, settings?.controller?.type, t])
+  }, [connectedPort, dispatch, flashStatus, showErrorNotification, settings?.connection?.baudRate, settings?.connection?.port, settings?.controller?.type, t])
   
   // Restore state from API on mount (only when needed - not on every navigation)
   // Only restore if:

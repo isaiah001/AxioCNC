@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, HelpCircle, Loader2, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ProbeCircuitVerification } from '@/components/ProbeCircuitVerification'
 import { buildSetZeroCommand, buildSetZeroWithOffsetCommand } from '@/utils/gcode'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
 import { appendProbeInput } from '@/utils/probeInput'
@@ -33,7 +34,7 @@ export function BitZeroXYZBlock({ methods, context, onComplete, onError, debugAl
   const zMethod = (methods[1] ?? methods[0]) as BitZeroConfig | undefined
   const { currentWCS, connectedPort, clearBitsetterReference, probeContact } = context
 
-  const showVerifyStep = xyMethod?.requireCheck !== false
+  const showVerifyStep = xyMethod?.requireCheck !== false || zMethod?.requireCheck !== false
   const totalSteps = showVerifyStep ? 6 : 5
   const runStep = showVerifyStep ? 5 : 4
   const cleanupStep = runStep + 1
@@ -156,6 +157,21 @@ export function BitZeroXYZBlock({ methods, context, onComplete, onError, debugAl
     return <p className="text-sm text-muted-foreground">{t('Invalid method')}</p>
   }
 
+  const verifyXY = xyMethod.requireCheck !== false
+  const verifyZ = zMethod.requireCheck !== false
+  const verificationTargets = verifyXY && verifyZ
+    ? xyMethod.probeInput === zMethod.probeInput
+      ? [{ id: `${xyMethod.id}-xyz`, label: t('XY and Z'), probeInput: xyMethod.probeInput }]
+      : [
+          { id: `${xyMethod.id}-xy`, label: t('XY'), probeInput: xyMethod.probeInput },
+          { id: `${zMethod.id}-z`, label: t('Z'), probeInput: zMethod.probeInput },
+        ]
+    : verifyXY
+      ? [{ id: `${xyMethod.id}-xy`, label: t('XY'), probeInput: xyMethod.probeInput }]
+      : verifyZ
+        ? [{ id: `${zMethod.id}-z`, label: t('Z'), probeInput: zMethod.probeInput }]
+        : []
+
   const canGoBack = step > 1
   const stepTitles: Record<number, string> = {
     1: t('Install Probing Pin'),
@@ -242,21 +258,11 @@ export function BitZeroXYZBlock({ methods, context, onComplete, onError, debugAl
               {t('Attach the magnetic conductor to the tool, then lift the BitZero probe until it touches the tool. If the probe triggers correctly, the magnetic conductor is properly attached and the circuit is functioning.')}
             </p>
           </div>
-          <div className={`p-3 rounded-lg border ${
-            probeContact ? 'bg-green-500/10 border-green-500/30' : 'bg-muted/50 border-border'
-          }`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${probeContact ? 'bg-green-500' : 'bg-muted'}`} />
-              <span className="text-sm font-medium">
-                {t('Probe Status')}: {probeContact ? t('Contact Detected') : t('No Contact')}
-              </span>
-            </div>
-            {probeContact && (
-              <p className="text-xs text-green-900 dark:text-green-100 mt-1 ml-5">
-                {t('The probe circuit is working correctly. You can proceed to the next step.')}
-              </p>
-            )}
-          </div>
+          <ProbeCircuitVerification
+            connectedPort={connectedPort}
+            targets={verificationTargets}
+            fallbackProbeContact={probeContact ?? false}
+          />
         </div>
       )}
 

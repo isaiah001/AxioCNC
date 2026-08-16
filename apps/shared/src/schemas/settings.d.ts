@@ -35,7 +35,7 @@ export type MachineLimits = z.infer<typeof MachineLimitsSchema>;
 export type ConnectionSettings = z.infer<typeof ConnectionSettingsSchema>;
 export type CameraSettings = z.infer<typeof CameraSettingsSchema>;
 export type Position = z.infer<typeof PositionSchema>;
-export type ProbeInput = z.infer<typeof ProbeInputSchema>;
+export type ProbeInput = 0 | 1 | 2;
 
 // Zeroing method types
 export type ZeroingMethod = z.infer<typeof ZeroingMethodSchema>;

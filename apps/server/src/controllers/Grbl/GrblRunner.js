@@ -30,6 +30,11 @@ class GrblRunner extends events.EventEmitter {
           y: '0.000',
           z: '0.000'
         },
+        probeInputs: {
+          0: { available: false, triggered: false, sequence: 0 },
+          1: { available: false, triggered: false, sequence: 0 },
+          2: { available: false, triggered: false, sequence: 0 }
+        },
         ov: []
       },
       parserstate: {
@@ -59,6 +64,30 @@ class GrblRunner extends events.EventEmitter {
     };
 
     parser = new GrblLineParser();
+
+    probeInputSequence = 0;
+
+    updateProbeInputState(input, available, triggered) {
+      if (![0, 1, 2].includes(input)) {
+        return;
+      }
+
+      this.probeInputSequence += 1;
+      this.state = {
+        ...this.state,
+        status: {
+          ...this.state.status,
+          probeInputs: {
+            ...this.state.status.probeInputs,
+            [input]: {
+              available,
+              triggered,
+              sequence: this.probeInputSequence
+            }
+          }
+        }
+      };
+    }
 
     parse(data) {
       data = ('' + data).replace(/\s+$/, '');
@@ -169,6 +198,10 @@ class GrblRunner extends events.EventEmitter {
         return;
       }
       if (type === GrblLineParserResultFeedback) {
+        const probeInput = payload.probeInput;
+        if (probeInput && probeInput.input !== undefined) {
+          this.updateProbeInputState(probeInput.input, probeInput.available, probeInput.triggered);
+        }
         this.emit('feedback', payload);
         return;
       }

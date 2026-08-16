@@ -108,5 +108,26 @@ test('MachineStatusManager', (t) => {
     subt.end();
   });
 
+  t.test('handleControllerState - forwards structured probe inputs', (subt) => {
+    const manager = new MachineStatusManager();
+    const probeInputs = {
+      0: { available: true, triggered: false, sequence: 1 },
+      1: { available: true, triggered: true, sequence: 2 },
+      2: { available: false, triggered: false, sequence: 3 }
+    };
+
+    manager.handleControllerState('COM1', 'Grbl', {
+      status: {
+        activeState: 'Idle',
+        probeInputs
+      }
+    });
+
+    const status = manager.getStatus('COM1');
+    subt.same(status.controllerState.probeInputs, probeInputs, 'should expose P0, P1, and P2 in controllerState');
+    subt.same(status.controllerState.probeInputs[0], probeInputs[0], 'should preserve the falsy P0 key');
+    subt.end();
+  });
+
   t.end();
 });
