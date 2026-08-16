@@ -42,6 +42,12 @@ import {
 
 // % commands
 const WAIT = '%wait';
+const PROBE_STATE_QUERY_TIMEOUT_MS = 2000;
+const PROBE_STATE_COMMANDS = {
+  0: '$#=_probe_state',
+  1: '$#=_toolsetter_state',
+  2: '$#=_probe2_state'
+};
 
 const log = logger('controller:Grbl');
 const noop = _.noop;
@@ -82,19 +88,19 @@ class GrblController {
         this.ready = false;
         if (err) {
           log.error(`Unexpected error while reading/writing serial port "${this.options.port}":`, err);
-          
+
           // Track controller error
           if (analytics.isEnabled()) {
             try {
               const errorMessage = err.message || String(err);
-              const sanitizedMessage = errorMessage.length > 200 
-                ? errorMessage.substring(0, 200) + '...' 
+              const sanitizedMessage = errorMessage.length > 200
+                ? errorMessage.substring(0, 200) + '...'
                 : errorMessage;
-              
+
               // Sanitize port (remove full path, keep device name)
               const port = this.options.port || 'unknown';
               const sanitizedPort = port.split(/[/\\]/).pop() || port;
-              
+
               // Determine error type
               let errorType = 'unknown';
               if (errorMessage.toLowerCase().includes('timeout')) {
@@ -104,7 +110,7 @@ class GrblController {
               } else if (errorMessage.toLowerCase().includes('connection') || errorMessage.toLowerCase().includes('connection_lost')) {
                 errorType = 'connection_lost';
               }
-              
+
               analytics.track('controller_error', {
                 controller_type: this.type || 'Grbl',
                 error_type: errorType,
@@ -137,6 +143,16 @@ class GrblController {
     homed = false;
 
     queryTimer = null;
+
+    probeStateQueryQueue = [];
+
+    probeStateQueryPending = null;
+
+    probeStateQueryTimer = null;
+
+    auxiliaryLineOwners = [];
+
+    senderResponsesToDrain = 0;
 
     actionMask = {
       queryParserState: {
@@ -317,6 +333,7 @@ class GrblController {
           source: WRITE_SOURCE_FEEDER
         });
 
+        this.auxiliaryLineOwners.push('feeder');
         this.connection.write(line + '\n');
         log.silly(`> ${line}`);
       });
@@ -472,6 +489,10 @@ class GrblController {
         // Emit job completion event (for frontend/Socket.IO)
         // IMPORTANT: Get sender state BEFORE rewinding, otherwise sent/received will be reset to 0
         const senderState = this.sender.toJSON();
+        this.senderResponsesToDrain = Math.max(
+          this.senderResponsesToDrain,
+          Math.max((senderState.sent || 0) - (senderState.received || 0), 0)
+        );
         this.sender.rewind();
         const completionInfo = {
           reason: reason || 'unknown',
@@ -593,12 +614,23 @@ class GrblController {
       });
 
       this.runner.on('ok', (res) => {
+        if (this.auxiliaryLineOwners[0] === 'probe-state') {
+          this.auxiliaryLineOwners.shift();
+          this.emit('serialport:read', res.raw);
+          this.finishProbeStateQuery();
+          return;
+        }
+
         if (this.actionMask.queryParserState.reply) {
           if (this.actionMask.replyParserState) {
             this.actionMask.replyParserState = false;
             this.emit('serialport:read', res.raw);
           }
           this.actionMask.queryParserState.reply = false;
+          if (this.auxiliaryLineOwners[0] === 'client') {
+            this.auxiliaryLineOwners.shift();
+          }
+          this.startFeederIfIdle();
           return;
         }
 
@@ -623,31 +655,50 @@ class GrblController {
           }
           this.sender.ack();
           this.sender.next();
+          this.startFeederIfIdle();
           return;
         }
 
-        this.emit('serialport:read', res.raw);
+        if (this.senderResponsesToDrain > 0) {
+          this.senderResponsesToDrain -= 1;
+          this.emit('serialport:read', res.raw);
+          this.startFeederIfIdle();
+          return;
+        }
 
-        // Feeder
-        this.feeder.next();
+        this.auxiliaryLineOwners.shift();
+        this.emit('serialport:read', res.raw);
+        this.startFeederIfIdle();
       });
 
       this.runner.on('error', (res) => {
         const code = Number(res.message) || undefined;
         const error = _.find(GRBL_ERRORS, { code: code });
-        
+
+        if (this.auxiliaryLineOwners[0] === 'probe-state') {
+          const input = this.probeStateQueryPending?.input;
+          this.auxiliaryLineOwners.shift();
+          this.cancelProbeStateQueries();
+          if (input !== undefined) {
+            this.runner.updateProbeInputState(input, false, false);
+          }
+          this.emit('serialport:read', error ? `error:${code} (${error.message})` : res.raw);
+          this.startFeederIfIdle();
+          return;
+        }
+
         // Track controller error from runner
         if (analytics.isEnabled()) {
           try {
             const errorMessage = error ? error.message : `Error code ${code}`;
-            const sanitizedMessage = errorMessage.length > 200 
-              ? errorMessage.substring(0, 200) + '...' 
+            const sanitizedMessage = errorMessage.length > 200
+              ? errorMessage.substring(0, 200) + '...'
               : errorMessage;
-            
+
             // Sanitize port
             const port = this.options.port || 'unknown';
             const sanitizedPort = port.split(/[/\\]/).pop() || port;
-            
+
             // Determine error type
             let errorType = 'parse_error'; // Grbl errors are typically parse errors
             if (errorMessage.toLowerCase().includes('timeout')) {
@@ -655,7 +706,7 @@ class GrblController {
             } else if (errorMessage.toLowerCase().includes('connection')) {
               errorType = 'connection_lost';
             }
-            
+
             analytics.track('controller_error', {
               controller_type: this.type || 'Grbl',
               error_type: errorType,
@@ -691,6 +742,25 @@ class GrblController {
           return;
         }
 
+        const { sent, received } = this.sender.state;
+        if (this.workflow.state === WORKFLOW_STATE_PAUSED && received < sent) {
+          const line = this.sender.state.lines[received] || '';
+          this.emit('serialport:read', `> ${line.trim()} (line=${received + 1})`);
+          this.emit('serialport:read', error ? `error:${code} (${error.message})` : res.raw);
+          this.sender.ack();
+          this.sender.next();
+          this.startFeederIfIdle();
+          return;
+        }
+
+        if (this.senderResponsesToDrain > 0) {
+          this.senderResponsesToDrain -= 1;
+          this.emit('serialport:read', error ? `error:${code} (${error.message})` : res.raw);
+          this.startFeederIfIdle();
+          return;
+        }
+
+        this.auxiliaryLineOwners.shift();
         if (error) {
           // Grbl v1.1
           this.emit('serialport:read', `error:${code} (${error.message})`);
@@ -699,13 +769,19 @@ class GrblController {
           this.emit('serialport:read', res.raw);
         }
 
-        // Feeder
-        this.feeder.next();
+        this.startFeederIfIdle();
       });
 
       this.runner.on('alarm', (res) => {
         const code = Number(res.message) || undefined;
         const alarm = _.find(GRBL_ALARMS, { code: code });
+
+        // An alarm aborts buffered commands without emitting an ok/error for
+        // each one. Drop their owners at this protocol boundary so unlock and
+        // subsequent commands cannot inherit stale acknowledgements.
+        this.workflow.stop('alarm');
+        this.feeder.reset();
+        this.clearActionValues();
 
         if (alarm) {
           // Grbl v1.1
@@ -759,14 +835,14 @@ class GrblController {
       this.runner.on('startup', (res) => {
         this.emit('serialport:read', res.raw);
 
-        if (!this.ready) {
-          // The startup message always prints upon startup, after a reset, or at program end.
-          // Setting the initial state when Grbl has completed re-initializing all systems.
-          this.clearActionValues();
+        // The startup banner is a serial protocol boundary: any command that
+        // was pending before it can no longer produce a matching response.
+        this.workflow.stop('controller_reset');
+        this.feeder.reset();
+        this.clearActionValues();
 
-          // Set ready flag to true when a startup message has arrived
-          this.ready = true;
-        }
+        // Set ready flag to true when Grbl has completed re-initializing.
+        this.ready = true;
 
         if (!this.initialized) {
           this.initialized = true;
@@ -827,7 +903,7 @@ class GrblController {
 
       const queryParserState = _.throttle(() => {
         // Check the ready flag
-        if (!(this.ready)) {
+        if (!(this.ready) || this.probeStateQueryPending || this.senderResponsesToDrain > 0 || this.auxiliaryLineOwners.length > 0 || this.feeder.size() > 0) {
           return;
         }
 
@@ -1027,6 +1103,9 @@ class GrblController {
     }
 
     clearActionValues() {
+      this.cancelProbeStateQueries();
+      this.auxiliaryLineOwners = [];
+      this.senderResponsesToDrain = 0;
       this.actionMask.queryParserState.state = false;
       this.actionMask.queryParserState.reply = false;
       this.actionMask.queryStatusReport = false;
@@ -1037,7 +1116,118 @@ class GrblController {
       this.actionTime.senderFinishTime = 0;
     }
 
+    prepareForControllerReset(reason) {
+      this.workflow.stop(reason);
+      this.feeder.reset();
+      this.clearActionValues();
+      this.ready = false;
+    }
+
+    canStartProbeStateQuery() {
+      if (!this.ready || this.isClose() || !this.runner || this.runner.isAlarm() || !this.sender || !this.feeder || !this.workflow) {
+        return false;
+      }
+
+      const { sent, received } = this.sender.state;
+      return this.workflow.state !== WORKFLOW_STATE_RUNNING &&
+        received >= sent &&
+        this.senderResponsesToDrain === 0 &&
+        this.auxiliaryLineOwners.length === 0 &&
+        !this.actionMask.queryParserState.state &&
+        !this.actionMask.queryParserState.reply &&
+        this.feeder.size() === 0;
+    }
+
+    enqueueProbeStateQuery(input) {
+      if (!Number.isInteger(input) || !Object.prototype.hasOwnProperty.call(PROBE_STATE_COMMANDS, input)) {
+        return;
+      }
+
+      if (this.probeStateQueryPending?.input === input || this.probeStateQueryQueue.includes(input)) {
+        return;
+      }
+
+      if (this.probeStateQueryPending?.timedOut) {
+        return;
+      }
+
+      if (!this.probeStateQueryPending && !this.canStartProbeStateQuery()) {
+        return;
+      }
+
+      this.probeStateQueryQueue.push(input);
+      this.startProbeStateQuery();
+    }
+
+    startProbeStateQuery() {
+      if (this.probeStateQueryPending || this.probeStateQueryQueue.length === 0) {
+        return;
+      }
+
+      if (!this.canStartProbeStateQuery()) {
+        this.probeStateQueryQueue = [];
+        return;
+      }
+
+      const input = this.probeStateQueryQueue.shift();
+      this.probeStateQueryPending = { input, timedOut: false };
+      this.probeStateQueryTimer = setTimeout(() => {
+        this.probeStateQueryTimer = null;
+        if (this.probeStateQueryPending) {
+          this.probeStateQueryPending.timedOut = true;
+        }
+        this.probeStateQueryQueue = [];
+      }, PROBE_STATE_QUERY_TIMEOUT_MS);
+      const written = this.writeln(PROBE_STATE_COMMANDS[input], {
+        source: 'probe-verification'
+      }, 'probe-state');
+      if (!written) {
+        this.cancelProbeStateQueries();
+        this.runner.updateProbeInputState(input, false, false);
+      }
+    }
+
+    finishProbeStateQuery() {
+      if (this.probeStateQueryTimer) {
+        clearTimeout(this.probeStateQueryTimer);
+        this.probeStateQueryTimer = null;
+      }
+      this.probeStateQueryPending = null;
+      this.startProbeStateQuery();
+      this.startFeederIfIdle();
+    }
+
+    cancelProbeStateQueries() {
+      if (this.probeStateQueryTimer) {
+        clearTimeout(this.probeStateQueryTimer);
+        this.probeStateQueryTimer = null;
+      }
+      this.probeStateQueryPending = null;
+      this.probeStateQueryQueue = [];
+    }
+
+    startFeederIfIdle() {
+      const { sent = 0, received = 0 } = this.sender?.state || {};
+      if (!this.feeder ||
+          this.runner?.isAlarm() ||
+          this.workflow?.state === WORKFLOW_STATE_RUNNING ||
+          received < sent ||
+          this.senderResponsesToDrain > 0 ||
+          this.probeStateQueryPending ||
+          this.auxiliaryLineOwners.length > 0 ||
+          this.actionMask.queryParserState.state ||
+          this.actionMask.queryParserState.reply) {
+        return false;
+      }
+
+      return this.feeder.next();
+    }
+
     destroy() {
+      this.cancelProbeStateQueries();
+      this.auxiliaryLineOwners = [];
+      this.senderResponsesToDrain = 0;
+
       if (this.queryTimer) {
         clearInterval(this.queryTimer);
         this.queryTimer = null;
@@ -1333,6 +1523,10 @@ class GrblController {
           this.command('gcode:start');
         },
         'gcode:start': () => {
+          if (this.probeStateQueryPending || this.senderResponsesToDrain > 0 || this.auxiliaryLineOwners.length > 0) {
+            return;
+          }
+
           this.event.trigger('gcode:start');
 
           this.workflow.start();
@@ -1370,6 +1564,7 @@ class GrblController {
 
             activeState = _.get(this.state, 'status.activeState', '');
             if (activeState === GRBL_ACTIVE_STATE_HOLD) {
+              this.prepareForControllerReset(reason);
               this.write('\x18'); // ^x
             }
           }
@@ -1389,6 +1584,10 @@ class GrblController {
           this.command('gcode:resume');
         },
         'gcode:resume': () => {
+          if (this.probeStateQueryPending || this.senderResponsesToDrain > 0 || this.auxiliaryLineOwners.length > 0) {
+            return;
+          }
+
           this.event.trigger('gcode:resume');
 
           this.write('~');
@@ -1399,15 +1598,19 @@ class GrblController {
           this.command('gcode', commands, context);
         },
         'feeder:start': () => {
-          if (this.workflow.state === WORKFLOW_STATE_RUNNING) {
+          if (this.workflow.state === WORKFLOW_STATE_RUNNING || this.probeStateQueryPending || this.senderResponsesToDrain > 0) {
             return;
           }
           this.write('~');
           this.feeder.unhold();
-          this.feeder.next();
+          this.startFeederIfIdle();
         },
         'feeder:stop': () => {
           this.feeder.reset();
+        },
+        'probe:state': () => {
+          const [input] = args;
+          this.enqueueProbeStateQuery(input);
         },
         'feedhold': () => {
           this.event.trigger('feedhold');
@@ -1436,10 +1639,7 @@ class GrblController {
           this.writeln('$X');
         },
         'reset': () => {
-          this.workflow.stop('reset');
-
-          this.feeder.reset();
-
+          this.prepareForControllerReset('reset');
           this.write('\x18'); // ^x
         },
         'jogCancel': () => {
@@ -1551,9 +1751,7 @@ class GrblController {
 
           this.feeder.feed(data, context);
 
-          if (!this.feeder.isPending()) {
-            this.feeder.next();
-          }
+          this.startFeederIfIdle();
         },
         'macro:run': () => {
           let [id, context = {}, callback = noop] = args;
@@ -1636,17 +1834,59 @@ class GrblController {
       log.silly(`> ${data}`);
     }
 
-    writeln(data, context) {
+    writeFromClient(data, context = {}) {
+      const isASCIIRealtimeCommand = _.includes(GRBL_REALTIME_COMMANDS, data);
+      const isExtendedASCIIRealtimeCommand = String(data).match(/^[\x80-\xff]$/);
+      if (!isASCIIRealtimeCommand && !isExtendedASCIIRealtimeCommand) {
+        log.warn('Rejected non-realtime raw client write; use writeln for line commands');
+        return false;
+      }
+
+      if (data === '\x18') {
+        this.prepareForControllerReset('client_reset');
+      }
+      this.write(data, context);
+      return true;
+    }
+
+    writeln(data, context = {}, lineOwner = 'client') {
       // https://github.com/gnea/grbl/blob/master/doc/markdown/commands.md#grbl-v11-realtime-commands
       const isASCIIRealtimeCommand = _.includes(GRBL_REALTIME_COMMANDS, data);
-      const isExtendedASCIIRealtimeCommand = String(data).match(/[\x80-\xff]/);
+      const isExtendedASCIIRealtimeCommand = String(data).match(/^[\x80-\xff]$/);
       const isRealtimeCommand = isASCIIRealtimeCommand || isExtendedASCIIRealtimeCommand;
 
       if (isRealtimeCommand) {
+        if (data === '\x18') {
+          this.prepareForControllerReset('client_reset');
+        }
         this.write(data, context);
-      } else {
-        this.write(data + '\n', context);
+        return true;
       }
+
+      const line = String(data);
+      if (line.trim().length === 0 || /[\r\n\x80-\xff]/.test(line)) {
+        log.warn('Rejected empty, multi-line, or mixed realtime writeln request');
+        return false;
+      }
+
+      if (this.isClose()) {
+        return false;
+      }
+
+      const { sent = 0, received = 0 } = this.sender?.state || {};
+      if ((this.probeStateQueryPending && lineOwner !== 'probe-state') ||
+          (lineOwner === 'client' &&
+            (this.workflow?.state === WORKFLOW_STATE_RUNNING ||
+             received < sent ||
+             this.senderResponsesToDrain > 0 ||
+             this.actionMask.queryParserState.state ||
+             this.actionMask.queryParserState.reply))) {
+        return false;
+      }
+
+      this.auxiliaryLineOwners.push(lineOwner);
+      this.write(line + '\n', context);
+      return true;
     }
 }
 

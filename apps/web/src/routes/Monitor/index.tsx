@@ -1153,13 +1153,17 @@ export default function Monitor() {
   // Listen for machine status to update probe contact
   useEffect(() => {
     const handleMachineStatus = (...args: unknown[]) => {
+      const port = args[0] as string
       const status = args[1] as {
         controllerState?: {
           pinState?: string | null // Grbl v1.1: 'P' indicates probe triggered
         }
       }
       
-      if (!status || !isConnected) return
+      if (!status
+        || !isConnected
+        || !settings?.connection?.port
+        || port !== settings.connection.port) return
       
       // Update probe contact status from pinState (Grbl v1.1)
       // pinState contains 'P' when probe is triggered
@@ -1174,7 +1178,7 @@ export default function Monitor() {
     return () => {
       socketService.off('machine:status', handleMachineStatus)
     }
-  }, [isConnected])
+  }, [isConnected, settings?.connection?.port])
   
   // Panel props with real state from Redux
   const panelProps: PanelProps = {

@@ -1070,5 +1070,10 @@
   "Primary probe": "Primary probe",
   "Toolsetter": "Toolsetter",
   "Secondary probe": "Secondary probe",
-  "Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support.": "Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support."
+  "Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support.": "Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support.",
+  "Reading selected probe input…": "Reading selected probe input…",
+  "Unavailable": "Unavailable",
+  "The selected probe input could not be read. Check that the input exists and that the controller firmware supports probe state parameters.": "The selected probe input could not be read. Check that the input exists and that the controller firmware supports probe state parameters.",
+  "The probe is already active. Release it, then trigger it again to verify the circuit.": "The probe is already active. Release it, then trigger it again to verify the circuit.",
+  "XY and Z": "XY and Z"
 }

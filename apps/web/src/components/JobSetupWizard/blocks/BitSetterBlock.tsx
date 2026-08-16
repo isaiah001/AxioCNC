@@ -3,6 +3,7 @@ import { useStore } from 'react-redux'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, HelpCircle, Check, Navigation, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ProbeCircuitVerification } from '@/components/ProbeCircuitVerification'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
 import { appendProbeInput } from '@/utils/probeInput'
 import { selectWorkPosition } from '@/store/hooks'
@@ -225,21 +226,11 @@ export function BitSetterBlock({ methods, context, onComplete, onError, debugAll
               {t('Press the BitSetter sensor down. If the probe triggers correctly, you\'re ready to proceed. If not, check your wiring and probe settings.')}
             </p>
           </div>
-          <div className={`p-3 rounded-lg border ${
-            probeContact ? 'bg-green-500/10 border-green-500/30' : 'bg-muted/50 border-border'
-          }`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${probeContact ? 'bg-green-500' : 'bg-muted'}`} />
-              <span className="text-sm font-medium">
-                {t('Probe Status')}: {probeContact ? t('Contact Detected') : t('No Contact')}
-              </span>
-            </div>
-            {probeContact && (
-              <p className="text-xs text-green-900 dark:text-green-100 mt-1 ml-5">
-                {t('The probe circuit is working correctly. You can proceed to the next step.')}
-              </p>
-            )}
-          </div>
+          <ProbeCircuitVerification
+            connectedPort={connectedPort}
+            targets={[{ id: method.id, probeInput: method.probeInput }]}
+            fallbackProbeContact={probeContact ?? false}
+          />
         </div>
       )}
 

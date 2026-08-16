@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, HelpCircle, Loader2, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ProbeCircuitVerification } from '@/components/ProbeCircuitVerification'
 import { buildSetZeroWithOffsetCommand } from '@/utils/gcode'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
 import { appendProbeInput } from '@/utils/probeInput'
@@ -159,25 +160,11 @@ export function BitZeroZBlock({ methods, context, onComplete, onError, debugAllo
               {t('Attach the magnetic conductor to the tool, then lift the BitZero probe until it touches the tool. If the probe triggers correctly, the magnetic conductor is properly attached and the circuit is functioning.')}
             </p>
           </div>
-          <div className={`p-3 rounded-lg border ${
-            probeContact
-              ? 'bg-green-500/10 border-green-500/30'
-              : 'bg-muted/50 border-border'
-          }`}>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${
-                probeContact ? 'bg-green-500' : 'bg-muted'
-              }`} />
-              <span className="text-sm font-medium">
-                {t('Probe Status')}: {probeContact ? t('Contact Detected') : t('No Contact')}
-              </span>
-            </div>
-            {probeContact && (
-              <p className="text-xs text-green-900 dark:text-green-100 mt-1 ml-5">
-                {t('The probe circuit is working correctly. You can proceed to the next step.')}
-              </p>
-            )}
-          </div>
+          <ProbeCircuitVerification
+            connectedPort={connectedPort}
+            targets={[{ id: method.id, probeInput: method.probeInput }]}
+            fallbackProbeContact={probeContact ?? false}
+          />
         </div>
       )}
 

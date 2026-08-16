@@ -21,7 +21,7 @@ class MachineStatusManager extends events.EventEmitter {
      * - isHomed: boolean
      * - isJobRunning: boolean
      * - homingInProgress: boolean
-     * - controllerState: { activeState, mpos, wpos } | null
+     * - controllerState: { activeState, mpos, wpos, probeInputs } | null
      * - parserstate: { modal: { spindle, coolant, motion, ... }, spindle, tool, feedrate } | null
      * - status: { buf: { planner, rx } } | null (full status buffer info)
      * - workflowState: 'idle' | 'running' | 'paused' | null
@@ -302,6 +302,7 @@ class MachineStatusManager extends events.EventEmitter {
                 activeState: currentActiveState,
                 mpos: state.status?.mpos || null,
                 wpos: state.status?.wpos || null,
+                probeInputs: state.status?.probeInputs || null,
                 pinState: state.status?.pinState || null, // Grbl v1.1: input pin state ('XYZPDHRS' indicates triggered pins)
                 accessoryState: state.status?.accessoryState || null // Grbl v1.1: accessory state ('SCFM' indicates spindle/coolant state)
             },

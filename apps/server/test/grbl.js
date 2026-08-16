@@ -1,6 +1,7 @@
 import { test } from 'tap';
 import trim from 'lodash/trim';
 import GrblRunner from '../src/controllers/Grbl/GrblRunner';
+import GrblLineParserResultFeedback from '../src/controllers/Grbl/GrblLineParserResultFeedback';
 
 // $10 - Status report mask:binary
 // Report Type      | Value
@@ -953,6 +954,36 @@ test('GrblLineParserResultFeedback', (t) => {
   lines.forEach(line => {
     runner.parse(line);
   });
+});
+
+test('GrblLineParserResultFeedback: grblHAL probe input parameters', (t) => {
+  const cases = [
+    ['[PARAM:_probe_state=0]', 0, true, false],
+    ['[PARAM:_toolsetter_state=1]', 1, true, true],
+    ['[PARAM:_probe2_state=-1]', 2, false, false],
+    ['[PARAM:_probe2_state=N/A]', 2, false, false]
+  ];
+
+  cases.forEach(([line, input, available, triggered]) => {
+    const result = GrblLineParserResultFeedback.parse(line);
+
+    t.equal(result.type, GrblLineParserResultFeedback, `${line} should use the feedback parser`);
+    t.same(result.payload, {
+      message: line.slice(1, -1),
+      probeInput: { input, available, triggered }
+    }, `${line} should expose structured probe input state`);
+  });
+
+  const generic = GrblLineParserResultFeedback.parse('[PARAM:_other_state=1]');
+  t.same(generic.payload, {
+    message: 'PARAM:_other_state=1'
+  }, 'unrelated named parameters should remain generic feedback');
+
+  const message = GrblLineParserResultFeedback.parse('[MSG:PARAM:_probe_state=1]');
+  t.same(message.payload, {
+    message: 'PARAM:_probe_state=1'
+  }, 'MSG text that resembles a parameter must remain generic feedback');
+  t.end();
 });
 
 test('GrblLineParserResultSettings', (t) => {

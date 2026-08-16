@@ -470,24 +470,24 @@ class CNCEngine {
             try {
               const sender = controller.sender;
               const jobActions = ['gcode:start', 'gcode:pause', 'gcode:resume', 'gcode:stop'];
-              
+
               if (jobActions.includes(cmd)) {
                 const action = cmd.replace('gcode:', ''); // 'start', 'pause', 'resume', 'stop'
                 const senderState = sender.state || {};
                 const fileName = senderState.name || 'unknown';
                 const fileSize = senderState.size || 0;
                 const lineCount = senderState.total || 0;
-                
+
                 // Calculate progress for complete/stop actions
                 let progressPercent = null;
                 if ((action === 'stop' || action === 'complete') && lineCount > 0) {
                   const linesReceived = senderState.received || 0;
                   progressPercent = Math.round((linesReceived / lineCount) * 100);
                 }
-                
+
                 // Sanitize file name (remove path, keep only filename)
                 const sanitizedFileName = fileName.split(/[/\\]/).pop() || fileName;
-                
+
                 analytics.track('job_execution', {
                   action,
                   file_name: sanitizedFileName,
@@ -516,7 +516,11 @@ class CNCEngine {
             return;
           }
 
-          controller.write(data, context);
+          if (typeof controller.writeFromClient === 'function') {
+            controller.writeFromClient(data, context);
+          } else {
+            controller.write(data, context);
+          }
         });
 
         socket.on('writeln', (port, data, context = {}) => {

@@ -260,3 +260,53 @@ test('GrblRunner parse() edge cases', (t) => {
 
   t.end();
 });
+
+test('GrblRunner tracks grblHAL probe input state', (t) => {
+  const runner = new GrblRunner();
+
+  t.same(runner.state.status.probeInputs, {
+    0: { available: false, triggered: false, sequence: 0 },
+    1: { available: false, triggered: false, sequence: 0 },
+    2: { available: false, triggered: false, sequence: 0 }
+  }, 'all probe inputs should start unavailable');
+
+  runner.parse('[PARAM:_probe_state=0]');
+  t.same(runner.state.status.probeInputs[0], {
+    available: true,
+    triggered: false,
+    sequence: 1
+  }, 'P0 should be updated even though its input id is falsy');
+
+  runner.parse('[PARAM:_toolsetter_state=1]');
+  t.same(runner.state.status.probeInputs[1], {
+    available: true,
+    triggered: true,
+    sequence: 2
+  }, 'P1 should report a triggered toolsetter');
+
+  runner.parse('[PARAM:_probe2_state=-1]');
+  t.same(runner.state.status.probeInputs[2], {
+    available: false,
+    triggered: false,
+    sequence: 3
+  }, 'P2 should report an unavailable input');
+
+  runner.parse('[PARAM:_probe_state=N/A]');
+  t.same(runner.state.status.probeInputs[0], {
+    available: false,
+    triggered: false,
+    sequence: 4
+  }, 'N/A should also mark an input unavailable and advance its sequence');
+
+  runner.parse('[MSG:Hello]');
+  t.equal(runner.probeInputSequence, 4, 'unrelated feedback should not advance the probe sequence');
+
+  runner.parse('[MSG:PARAM:_probe_state=1]');
+  t.equal(runner.probeInputSequence, 4, 'MSG text that resembles a parameter should not advance the probe sequence');
+  t.same(runner.state.status.probeInputs[0], {
+    available: false,
+    triggered: false,
+    sequence: 4
+  }, 'MSG text should not alter the probe input state');
+  t.end();
+});
