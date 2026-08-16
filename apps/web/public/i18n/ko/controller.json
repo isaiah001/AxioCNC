@@ -1,0 +1,43 @@
+{
+  "TinyG": {
+    "machineState": {
+      "initializing": "초기화 중",
+      "ready": "준비됨",
+      "alarm": "알람",
+      "stop": "프로그램 정지",
+      "end": "프로그램 종료",
+      "run": "실행",
+      "hold": "일시 정지",
+      "probe": "프로브",
+      "cycle": "사이클",
+      "homing": "원점 복귀",
+      "jog": "조그",
+      "interlock": "인터록",
+      "shutdown": "종료",
+      "panic": "패닉"
+    }
+  },
+  "Grbl": {
+    "activeState": {
+      "idle": "대기",
+      "run": "실행",
+      "hold": "일시 정지",
+      "door": "도어 열림",
+      "home": "원점 복귀",
+      "sleep": "절전",
+      "alarm": "알람",
+      "check": "확인"
+    }
+  },
+  "Smoothie": {
+    "activeState": {
+      "idle": "대기",
+      "run": "실행",
+      "hold": "일시 정지",
+      "door": "도어 열림",
+      "home": "원점 복귀",
+      "alarm": "알람",
+      "check": "확인"
+    }
+  }
+}

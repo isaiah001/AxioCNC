@@ -56,6 +56,7 @@ const SUPPORTED_LANGUAGES_ALL = [
   { value: 'hu', label: 'Magyar' },
   { value: 'it', label: 'Italiano' },
   { value: 'ja', label: '日本語' },
+  { value: 'ko', label: '한국어' },
   { value: 'nb', label: 'Norsk' },
   { value: 'nl', label: 'Nederlands' },
   { value: 'pt', label: 'Português' },

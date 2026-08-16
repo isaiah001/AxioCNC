@@ -121,6 +121,7 @@ export default {
       'hu', // Hungarian
       'it', // Italian
       'ja', // Japanese
+      'ko', // Korean
       'nb', // Norwegian
       'nl', // Dutch
       'pt', // Portuguese (Portugal)
