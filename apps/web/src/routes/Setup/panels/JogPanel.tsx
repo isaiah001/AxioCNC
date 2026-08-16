@@ -277,6 +277,14 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
     updateZFromPointer(e.clientY)
   }, [stopZJog, updateZFromPointer])
 
+  // Mobile browsers can still open their long-press callout/context menu even
+  // with touch-action: none. Keep those native gestures out of the analog
+  // controls so a held low-speed jog remains an uninterrupted pointer gesture.
+  const suppressNativeAnalogGesture = useCallback((e: React.SyntheticEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
   // Any interruption of an active browser gesture must explicitly neutralize
   // the server input. Pointer capture covers leaving the control bounds; these
   // handlers cover app switching, navigation, and connection loss.
@@ -535,11 +543,15 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
             <div 
               ref={xyJoystickRef}
               className="relative w-36 h-36 rounded-full bg-muted border-2 border-border cursor-crosshair touch-none select-none"
+              style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+              draggable={false}
               onPointerDown={handleXYPointerDown}
               onPointerMove={handleXYPointerMove}
               onPointerUp={(e) => stopXYJog(e.pointerId)}
               onPointerCancel={(e) => stopXYJog(e.pointerId)}
               onLostPointerCapture={(e) => stopXYJog(e.pointerId)}
+              onContextMenu={suppressNativeAnalogGesture}
+              onDragStart={suppressNativeAnalogGesture}
             >
               {/* Crosshairs */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -567,11 +579,15 @@ export function JogPanel({ isConnected, connectedPort, machineStatus, onFlashSta
               <div 
                 ref={zLeverRef}
                 className="relative h-32 w-10 rounded-full bg-muted border-2 border-border cursor-ns-resize touch-none select-none"
+                style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+                draggable={false}
                 onPointerDown={handleZPointerDown}
                 onPointerMove={handleZPointerMove}
                 onPointerUp={(e) => stopZJog(e.pointerId)}
                 onPointerCancel={(e) => stopZJog(e.pointerId)}
                 onLostPointerCapture={(e) => stopZJog(e.pointerId)}
+                onContextMenu={suppressNativeAnalogGesture}
+                onDragStart={suppressNativeAnalogGesture}
               >
                 {/* Center line */}
                 <div className="absolute top-1/2 left-2 right-2 h-px bg-border" />
