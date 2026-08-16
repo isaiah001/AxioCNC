@@ -28,6 +28,13 @@ const probeMethodFixtures = [
     enabled: true,
     axes: 'xyz',
   },
+  {
+    id: 'edgeprobe',
+    type: 'edgeprobe',
+    name: 'Edge Probe',
+    enabled: true,
+    axes: 'xyz',
+  },
 ];
 
 test('Settings Schema Functions', (t) => {
@@ -206,6 +213,27 @@ test('Settings Schema Functions', (t) => {
         subt.notOk(result.success, `${method.type} should reject probeInput ${JSON.stringify(probeInput)}`);
       });
     });
+
+    subt.end();
+  });
+
+  t.test('edge probe applies calibrated motion defaults and validates positive distances', (subt) => {
+    const fixture = probeMethodFixtures.find((method) => method.type === 'edgeprobe');
+    const result = ZeroingMethodSchema.safeParse(fixture);
+
+    subt.ok(result.success, 'edge probe should parse');
+    subt.equal(result.data?.tipDiameter, 4, 'tip diameter default');
+    subt.equal(result.data?.fineProbeFeedrate, 25, 'fine feedrate default');
+    subt.equal(result.data?.retractDistance, 2, 'retract distance default');
+    subt.equal(result.data?.cornerSweepDistance, 20, 'corner sweep default');
+    subt.notOk(
+      ZeroingMethodSchema.safeParse({ ...fixture, tipDiameter: 0 }).success,
+      'zero tip diameter should be rejected'
+    );
+    subt.notOk(
+      ZeroingMethodSchema.safeParse({ ...fixture, cornerSweepDistance: -1 }).success,
+      'negative corner sweep should be rejected'
+    );
 
     subt.end();
   });

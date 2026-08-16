@@ -33,7 +33,7 @@ export function parseWorkZeroValue(serialized: string): string[] {
 
 /**
  * Work XY zero options derived from enabled methods.
- * Order: BitZero (XY), Touchplate X then Y (if both exist), Manual.
+ * Order: Edge Probe, BitZero (XY), Touchplate X then Y (if both exist), Manual.
  */
 export function getWorkXYZeroOptions(
   methods: ZeroingMethod[],
@@ -41,6 +41,15 @@ export function getWorkXYZeroOptions(
 ): WorkXYZeroOption[] {
   const enabled = methods.filter((m) => m.enabled)
   const options: WorkXYZeroOption[] = []
+
+  const edgeProbe = enabled.find((m) => m.type === 'edgeprobe')
+  if (edgeProbe) {
+    options.push({
+      value: [edgeProbe.id],
+      labelKey: 'Edge Probe (XY)',
+      label: edgeProbe.name || t('Edge Probe (XY)'),
+    })
+  }
 
   // One BitZero hardware (axes xyz) provides "BitZero (XY)" option; legacy axes 'xy' also supported
   const bitzeroXY = enabled.find(
@@ -92,7 +101,7 @@ export function getWorkXYZeroOptions(
 
 /**
  * Work Z zero options derived from enabled methods.
- * Order: BitZero (Z), Touchplate (Z), Manual.
+ * Order: Edge Probe, BitZero (Z), Touchplate (Z), Manual.
  */
 export function getWorkZZeroOptions(
   methods: ZeroingMethod[],
@@ -100,6 +109,15 @@ export function getWorkZZeroOptions(
 ): WorkZZeroOption[] {
   const enabled = methods.filter((m) => m.enabled)
   const options: WorkZZeroOption[] = []
+
+  const edgeProbe = enabled.find((m) => m.type === 'edgeprobe')
+  if (edgeProbe) {
+    options.push({
+      value: [edgeProbe.id],
+      labelKey: 'Edge Probe (Z)',
+      label: edgeProbe.name || t('Edge Probe (Z)'),
+    })
+  }
 
   // One BitZero hardware (axes xyz) provides "BitZero (Z)" option; legacy axes 'z' also supported
   const bitzeroZ = enabled.find(

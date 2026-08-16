@@ -17,6 +17,7 @@ export type {
   BitSetterConfig,
   BitZeroConfig,
   TouchPlateConfig,
+  EdgeProbeConfig,
   ManualConfig,
   CustomMethodConfig,
 } from './ZeroingMethodsSection'

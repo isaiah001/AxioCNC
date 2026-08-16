@@ -152,6 +152,21 @@ export const TouchPlateMethodSchema = BaseMethodSchema.extend({
   probingPinDiameterUnit: z.enum(['mm', 'in']).optional(),
 });
 
+// 3D spindle probe - calibrated stylus for X/Y/Z edges, corners, and centers
+export const EdgeProbeMethodSchema = BaseMethodSchema.extend({
+  type: z.literal('edgeprobe'),
+  axes: z.literal('xyz'),
+  probeInput: ProbeInputSchema.optional(),
+  tipDiameter: z.number().positive().default(4),
+  probeFeedrate: z.number().positive().default(100),
+  fineProbeFeedrate: z.number().positive().default(25),
+  probeDistance: z.number().positive().default(25),
+  retractDistance: z.number().positive().default(2),
+  cornerSweepDistance: z.number().positive().default(20),
+  zOffset: z.number().default(0),
+  requireCheck: z.boolean().default(true),
+});
+
 // Manual - user manually zeros (always available)
 export const ManualMethodSchema = BaseMethodSchema.extend({
   type: z.literal('manual'),
@@ -168,6 +183,7 @@ export const ZeroingMethodSchema = z.discriminatedUnion('type', [
   BitSetterMethodSchema,
   BitZeroMethodSchema,
   TouchPlateMethodSchema,
+  EdgeProbeMethodSchema,
   ManualMethodSchema,
   CustomMethodSchema,
 ]);
@@ -323,4 +339,3 @@ export const validatePartialSettings = (data) => {
 export const parseSettings = (data) => {
   return SystemSettingsSchema.parse(data);
 };
-

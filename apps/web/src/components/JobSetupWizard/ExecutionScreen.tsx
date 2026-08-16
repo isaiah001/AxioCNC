@@ -275,9 +275,9 @@ export function ExecutionScreen({
     <SetupBlockBackButton onClick={onBack} />
   ) : null
 
-  const isBlockWithMergedFooter = currentBlock.kind === 'bitzero_xy' || currentBlock.kind === 'bitzero_z' || currentBlock.kind === 'bitzero_xyz' || currentBlock.kind === 'bitsetter' || currentBlock.kind === 'manual_xy' || currentBlock.kind === 'manual_z' || currentBlock.kind === 'touchplate_x' || currentBlock.kind === 'touchplate_y' || currentBlock.kind === 'touchplate_xy' || currentBlock.kind === 'touchplate_z'
+  const isBlockWithMergedFooter = currentBlock.kind === 'bitzero_xy' || currentBlock.kind === 'bitzero_z' || currentBlock.kind === 'bitzero_xyz' || currentBlock.kind.startsWith('edgeprobe_') || currentBlock.kind === 'bitsetter' || currentBlock.kind === 'manual_xy' || currentBlock.kind === 'manual_z' || currentBlock.kind === 'touchplate_x' || currentBlock.kind === 'touchplate_y' || currentBlock.kind === 'touchplate_xy' || currentBlock.kind === 'touchplate_z'
   /** Blocks that render their own step progress or are single-step (manual); hide slot progress. */
-  const blockHasInternalProgress = currentBlock.kind === 'bitzero_xy' || currentBlock.kind === 'bitzero_z' || currentBlock.kind === 'bitzero_xyz' || currentBlock.kind === 'bitsetter' || currentBlock.kind === 'manual_xy' || currentBlock.kind === 'manual_z' || currentBlock.kind === 'touchplate_x' || currentBlock.kind === 'touchplate_y' || currentBlock.kind === 'touchplate_xy' || currentBlock.kind === 'touchplate_z'
+  const blockHasInternalProgress = currentBlock.kind === 'bitzero_xy' || currentBlock.kind === 'bitzero_z' || currentBlock.kind === 'bitzero_xyz' || currentBlock.kind.startsWith('edgeprobe_') || currentBlock.kind === 'bitsetter' || currentBlock.kind === 'manual_xy' || currentBlock.kind === 'manual_z' || currentBlock.kind === 'touchplate_x' || currentBlock.kind === 'touchplate_y' || currentBlock.kind === 'touchplate_xy' || currentBlock.kind === 'touchplate_z'
 
   const content = (
     <div className="flex w-full min-h-0 flex-1 flex-col gap-6">
