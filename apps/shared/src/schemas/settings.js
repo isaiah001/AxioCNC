@@ -99,6 +99,13 @@ export const PositionSchema = z.object({
   z: z.number().default(0),
 });
 
+// grblHAL probe input: primary probe (P0), toolsetter (P1), or secondary probe (P2)
+export const ProbeInputSchema = z.union([
+  z.literal(0),
+  z.literal(1),
+  z.literal(2),
+]);
+
 // Base fields shared by all zeroing methods
 const BaseMethodSchema = z.object({
   id: z.string(),
@@ -111,6 +118,7 @@ const BaseMethodSchema = z.object({
 export const BitSetterMethodSchema = BaseMethodSchema.extend({
   type: z.literal('bitsetter'),
   axes: z.literal('z'),
+  probeInput: ProbeInputSchema.optional(),
   position: PositionSchema.default({}),
   probeFeedrate: z.number().default(100),
   probeDistance: z.number().default(50),
@@ -122,6 +130,7 @@ export const BitSetterMethodSchema = BaseMethodSchema.extend({
 export const BitZeroMethodSchema = BaseMethodSchema.extend({
   type: z.literal('bitzero'),
   axes: z.enum(['xyz', 'xy', 'z']),
+  probeInput: ProbeInputSchema.optional(),
   probeThickness: z.number().default(12.7),
   probeFeedrate: z.number().default(100),
   probeDistance: z.number().default(25),
@@ -132,6 +141,7 @@ export const BitZeroMethodSchema = BaseMethodSchema.extend({
 export const TouchPlateMethodSchema = BaseMethodSchema.extend({
   type: z.literal('touchplate'),
   axes: z.enum(['x', 'y', 'z', 'xyz']),
+  probeInput: ProbeInputSchema.optional(),
   plateThickness: z.number().default(19.05),
   probeFeedrate: z.number().default(100),
   probeDistance: z.number().default(25),

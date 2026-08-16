@@ -1063,5 +1063,12 @@
   "Position XY over the touch plate": "Position XY over the touch plate",
   "Lower Z in small steps (0.1mm or less) when approaching probe height": "Lower Z in small steps (0.1mm or less) when approaching probe height",
   "Make sure the tool is positioned above the touch plate with enough clearance before starting. The tool should already be in position from the previous step.": "Make sure the tool is positioned above the touch plate with enough clearance before starting. The tool should already be in position from the previous step.",
-  "Use the jog controls to position the tool above the touch plate. The tool will probe straight down, so it should be above the plate surface.": "Use the jog controls to position the tool above the touch plate. The tool will probe straight down, so it should be above the plate surface."
+  "Use the jog controls to position the tool above the touch plate. The tool will probe straight down, so it should be above the plate surface.": "Use the jog controls to position the tool above the touch plate. The tool will probe straight down, so it should be above the plate surface.",
+  "Probe Input": "Probe Input",
+  "Select the probe input used by this zeroing method": "Select the probe input used by this zeroing method",
+  "Controller default": "Controller default",
+  "Primary probe": "Primary probe",
+  "Toolsetter": "Toolsetter",
+  "Secondary probe": "Secondary probe",
+  "Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support.": "Controller default omits the P word for compatibility. P0 is the primary probe, P1 the toolsetter, and P2 the secondary probe. Explicit selection requires G38.x P-word support."
 }

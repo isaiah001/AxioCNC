@@ -4,6 +4,7 @@ import { AlertCircle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, HelpCirc
 import { Button } from '@/components/ui/button'
 import { buildSetZeroWithOffsetCommand } from '@/utils/gcode'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
+import { appendProbeInput } from '@/utils/probeInput'
 import { SetupBlockLayout } from './SetupBlockLayout'
 import type { SetupBlockProps } from './types'
 import type { TouchPlateConfig } from '@/routes/Settings/sections/ZeroingMethodsSection'
@@ -106,9 +107,9 @@ export function TouchplateBlock({
         'G21',
         '',
         `; ${axisUpper}-Axis Probing (${direction})`,
-        `G38.2 ${axisUpper}${sign}${probeDistance} F${probeFeedrateA}`,
+        appendProbeInput(`G38.2 ${axisUpper}${sign}${probeDistance} F${probeFeedrateA}`, method.probeInput),
         direction === 'positive' ? `G0 ${axisUpper}-2` : `G0 ${axisUpper}2`,
-        `G38.2 ${axisUpper}${sign}5 F${probeFeedrateB}`,
+        appendProbeInput(`G38.2 ${axisUpper}${sign}5 F${probeFeedrateB}`, method.probeInput),
         'G90',
         setZeroCommand,
         'G91',
@@ -152,9 +153,9 @@ export function TouchplateBlock({
       'G21',
       '',
       '; Z-Axis Probing',
-      `G38.2 Z-${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 Z-${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 Z2',
-      `G38.2 Z-5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 Z-5 F${probeFeedrateB}`, method.probeInput),
       setZZeroCommand,
       `G0 Z${zFinal}`,
       '',

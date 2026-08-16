@@ -4,6 +4,7 @@ import { AlertCircle, Check, HelpCircle, Loader2, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { buildSetZeroWithOffsetCommand } from '@/utils/gcode'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
+import { appendProbeInput } from '@/utils/probeInput'
 import { SetupBlockLayout } from './SetupBlockLayout'
 import type { SetupBlockProps } from './types'
 import type { BitZeroConfig } from '@/routes/Settings/sections/ZeroingMethodsSection'
@@ -58,9 +59,9 @@ export function BitZeroZBlock({ methods, context, onComplete, onError, debugAllo
       'G21',
       '',
       '; Z-Axis Probing',
-      `G38.2 Z-${probeDistance} F${probeFeedrateA}`,
+      appendProbeInput(`G38.2 Z-${probeDistance} F${probeFeedrateA}`, method.probeInput),
       'G0 Z2',
-      `G38.2 Z-5 F${probeFeedrateB}`,
+      appendProbeInput(`G38.2 Z-5 F${probeFeedrateB}`, method.probeInput),
       setZZeroCommand,
       `G0 Z${zFinal}`,
       '',

@@ -5,6 +5,7 @@ import { AlertCircle, HelpCircle, Check, Navigation, Target } from 'lucide-react
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { runGcodeBatch } from '@/utils/runGcodeBatch'
+import { appendProbeInput } from '@/utils/probeInput'
 import { SetupBlockLayout } from '@/components/JobSetupWizard/blocks/SetupBlockLayout'
 import { useGetToolsQuery, useGetExtensionsQuery } from '@/services/api'
 import { useJobState, selectWorkPosition } from '@/store/hooks'
@@ -165,15 +166,15 @@ export function BitSetterToolChangeBlock({
       'M5',
       '',
       'G91',
-      `G38.2 Z-${probeDistance} F${probeRapidFeedrate}`,
+      appendProbeInput(`G38.2 Z-${probeDistance} F${probeRapidFeedrate}`, method.probeInput),
       'G0 z2',
-      'G38.2 z-5 F40',
+      appendProbeInput('G38.2 z-5 F40', method.probeInput),
       'G4 P.25',
-      'G38.4 z10 F20',
+      appendProbeInput('G38.4 z10 F20', method.probeInput),
       'G4 P.25',
-      'G38.2 z-2 F10',
+      appendProbeInput('G38.2 z-2 F10', method.probeInput),
       'G4 P.25',
-      'G38.4 z10 F5',
+      appendProbeInput('G38.4 z10 F5', method.probeInput),
       'G4 P.25',
       '',
       'G90',

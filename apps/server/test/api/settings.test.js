@@ -158,6 +158,50 @@ test('api.settings', (t) => {
     subt.end();
   });
 
+  t.test('POST /api/settings - persists zeroing method probe inputs', (subt) => {
+    const mockConfigStore = createMockConfigStore({ settings: {} });
+    const apiSettings = proxyquire('../../src/api/api.settings.js', {
+      '../services/configstore': { default: mockConfigStore },
+    });
+    const methods = [
+      { id: 'bitzero-p0', type: 'bitzero', name: 'Primary', enabled: true, axes: 'xyz', probeInput: 0 },
+      { id: 'bitsetter-p1', type: 'bitsetter', name: 'Toolsetter', enabled: true, axes: 'z', probeInput: 1 },
+      { id: 'touchplate-p2', type: 'touchplate', name: 'Secondary', enabled: true, axes: 'z', probeInput: 2 },
+    ];
+    const req = createMockRequest({ body: { zeroingMethods: { methods } } });
+    const res = createMockResponse();
+
+    apiSettings.set(req, res);
+
+    subt.equal(res.statusCode, 200);
+    const savedMethods = mockConfigStore.get('settings').zeroingMethods.methods;
+    subt.same(savedMethods.map(method => method.probeInput), [0, 1, 2]);
+    subt.end();
+  });
+
+  t.test('POST /api/settings - rejects an unavailable probe input ID', (subt) => {
+    const mockConfigStore = createMockConfigStore({ settings: {} });
+    const apiSettings = proxyquire('../../src/api/api.settings.js', {
+      '../services/configstore': { default: mockConfigStore },
+    });
+    const req = createMockRequest({
+      body: {
+        zeroingMethods: {
+          methods: [
+            { id: 'invalid-probe', type: 'bitzero', name: 'Invalid', enabled: true, axes: 'xyz', probeInput: 3 },
+          ],
+        },
+      },
+    });
+    const res = createMockResponse();
+
+    apiSettings.set(req, res);
+
+    subt.equal(res.statusCode, ERR_BAD_REQUEST);
+    subt.ok(res.body.errors.some(error => error.path.includes('probeInput')));
+    subt.end();
+  });
+
   t.test('POST /api/settings - merges with existing settings correctly', (subt) => {
     const existingSettings = {
       lang: 'en',
